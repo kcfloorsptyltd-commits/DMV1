@@ -78,6 +78,7 @@ export default {
                         inline: true,
                     }
                 )
+                .setThumbnail('https://i.imgur.com/7k5X2mH.png')
                 .setFooter({
                     text: `Requested by ${interaction.user.tag}`,
                     iconURL: interaction.user.displayAvatarURL(),
