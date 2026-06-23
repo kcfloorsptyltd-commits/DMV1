@@ -42,7 +42,7 @@ export default {
         const fightId = interaction.options.getString('fight-id');
 
         try {
-            const { fight, outcome } = await handleFightResult(
+            const { fight, outcome, winnerId: _winnerId } = await handleFightResult(
                 client,
                 interaction.guildId,
                 interaction.user.id,

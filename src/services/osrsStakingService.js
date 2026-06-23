@@ -215,7 +215,7 @@ export async function handleFightResult(client, guildId, userId, confirmation, f
         const latestFight = await getFight(client, fight.id);
         if (latestFight?.reported_winner) {
             fight.reported_winner = latestFight.reported_winner;
-            fight.reportedAt = latestFight.reportedAt || fight.reportedAt;
+            fight.reportedAt = latestFight.reportedAt || new Date().toISOString();
         } else {
             fight.reported_winner = userId;
             fight.reportedAt = new Date().toISOString();
