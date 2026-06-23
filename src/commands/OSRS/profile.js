@@ -10,21 +10,14 @@ import {
     buildFightStats,
     buildRecentActivityRows,
 } from '../../utils/osrsProfile.js';
-import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
+import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { logger } from '../../utils/logger.js';
+import { OSRS_LINK_STATUSES } from '../../utils/database/osrs.js';
 
 function formatUpdatedFooter(date = new Date()) {
     const iso = date.toISOString().replace('T', ' ').slice(0, 16);
     return `Last updated: ${iso} UTC`;
-}
-
-async function getMemberForProfile(interaction, targetUser) {
-    if (interaction.member?.user?.id === targetUser.id) {
-        return interaction.member;
-    }
-
-    return interaction.guild?.members?.fetch(targetUser.id).catch(() => null);
 }
 
 async function getAllLinkedRsnMappings(client, guildId) {
@@ -38,7 +31,11 @@ async function getAllLinkedRsnMappings(client, guildId) {
 
     for (const key of keys) {
         const userId = key.split(':').pop();
-        const usernames = normalizeLinkedOsrsUsernames(await client.db.get(key, []));
+        const record = await client.db.get(key, null);
+        if (!record) continue;
+        const status = record.status;
+        if (status && status !== OSRS_LINK_STATUSES.LINKED) continue;
+        const usernames = normalizeLinkedOsrsUsernames(record);
 
         for (const username of usernames) {
             rsnToUserId[username.toLowerCase()] = userId;
@@ -51,13 +48,7 @@ async function getAllLinkedRsnMappings(client, guildId) {
 export default {
     data: new SlashCommandBuilder()
         .setName('profile')
-        .setDescription('View an OSRS staking profile with linked accounts, balances, and fight stats')
-        .addUserOption((option) =>
-            option
-                .setName('user')
-                .setDescription('The member whose profile you want to view')
-                .setRequired(false),
-        )
+        .setDescription('View your OSRS staking profile with linked accounts, balances, and fight stats')
         .setDMPermission(false),
 
     execute: withErrorHandling(async (interaction, _config, client) => {
@@ -65,19 +56,14 @@ export default {
         if (!deferred) return;
 
         const guildId = interaction.guildId;
-        const targetUser = interaction.options.getUser('user') || interaction.user;
-        const member = await getMemberForProfile(interaction, targetUser);
+        const targetUser = interaction.user;
+        const member = interaction.member;
 
-        if (!member) {
-            throw createError(
-                'Target user is not in server',
-                ErrorTypes.VALIDATION,
-                'That Discord user is not currently in this server.',
-            );
-        }
+        const rawLinks = await client.db.get(getOsrsLinkKey(guildId, targetUser.id), null);
+        const linkStatus = rawLinks?.status;
+        const isLinked = !linkStatus || linkStatus === OSRS_LINK_STATUSES.LINKED;
+        const linkedUsernames = isLinked ? normalizeLinkedOsrsUsernames(rawLinks) : [];
 
-        const rawLinks = await client.db.get(getOsrsLinkKey(guildId, targetUser.id), []);
-        const linkedUsernames = normalizeLinkedOsrsUsernames(rawLinks);
         const economyData = await getEconomyData(client, guildId, targetUser.id);
         const recentEvents = await getRecentPvpEvents(guildId);
 
@@ -92,10 +78,20 @@ export default {
 
         const createdAt = Math.floor(targetUser.createdAt.getTime() / 1000);
         const userDisplayName = targetUser.username || targetUser.globalName || 'Unknown User';
+
+        let linkedRsnsValue = buildLinkedRsnsValue(linkedUsernames);
+        if (!isLinked && rawLinks) {
+            if (linkStatus === OSRS_LINK_STATUSES.PENDING) {
+                linkedRsnsValue = `🟡 ${rawLinks.osrsUsername} — Pending approval`;
+            } else if (linkStatus === OSRS_LINK_STATUSES.DECLINED) {
+                linkedRsnsValue = `❌ ${rawLinks.osrsUsername} — Declined`;
+            }
+        }
+
         const embed = createEmbed({
             title: `${userDisplayName}'s OSRS Profile`,
-            description: linkedUsernames.length === 0
-                ? '⚠️ No linked OSRS accounts found for this member yet.'
+            description: linkedUsernames.length === 0 && isLinked
+                ? '⚠️ No approved linked OSRS accounts found yet. Use /link-osrs to request linking.'
                 : 'Comprehensive staking profile overview.',
             color: 'primary',
             fields: [
@@ -118,7 +114,7 @@ export default {
                 },
                 {
                     name: '🎮 Linked RSNs',
-                    value: buildLinkedRsnsValue(linkedUsernames),
+                    value: linkedRsnsValue,
                     inline: true,
                 },
                 {
