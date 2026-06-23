@@ -166,8 +166,10 @@ const createTicketModalHandler = {
       );
       
       if (result.success && result.channel) {
+        // Format the channel as a mention
+        const channelMention = `<#${result.channel.id}>`;
         await interaction.editReply({
-          content: `✅ Your ticket has been created! Jump to it: ${result.channel}`,
+          content: `✅ Your ticket has been created! Jump to it: ${channelMention}`,
           embeds: []
         });
       } else {
