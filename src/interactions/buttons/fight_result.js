@@ -39,7 +39,7 @@ export default {
 
             const responderId = getPendingResponderId(currentFight);
             if (!responderId) {
-                throw new Error('This confirmation request is no longer active.');
+                throw new Error('Both fighters have already confirmed, or this confirmation request is no longer active.');
             }
 
             if (interaction.user.id !== responderId) {

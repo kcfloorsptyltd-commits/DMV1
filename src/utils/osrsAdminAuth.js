@@ -1,7 +1,7 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { getGuildConfig } from '../services/guildConfig.js';
 
-const ADMIN_ROLES = ['Owner', 'Administrator', 'Support Staff', 'Admin', 'Mod', 'Moderator'];
+const ADMIN_ROLES = ['Administrator', 'Support Staff', 'Admin', 'Mod', 'Moderator'];
 
 function normalizeRoleId(role) {
     if (!role) return null;
