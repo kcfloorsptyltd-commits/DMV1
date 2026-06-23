@@ -51,11 +51,50 @@ class TitanBot extends Client {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       startupLog('Initializing database...');
-      const dbInstance = await initializeDatabase();
-      this.db = dbInstance.db;
 
-      // Check database status and report
-      const dbStatus = this.db.getStatus();
+      // Robust database initialization: handle multiple possible return shapes
+      let dbWrapper = null;
+      try {
+        const result = await initializeDatabase();
+
+        // Case A: initializeDatabase returned an object containing { db: wrapper }
+        if (result && result.db && typeof result.getStatus !== 'function') {
+          // result.db might be the wrapper instance or the underlying store; prefer wrapper if present
+          dbWrapper = result.db;
+        }
+
+        // Case B: initializeDatabase returned the wrapper instance directly
+        if (!dbWrapper && result && typeof result.getStatus === 'function') {
+          dbWrapper = result;
+        }
+
+        // Case C: initializeDatabase returned something else (or undefined) — import singleton wrapper
+        if (!dbWrapper) {
+          const wrapperModule = await import('./utils/database/wrapper.js');
+          const candidate = wrapperModule.db ?? wrapperModule.default ?? wrapperModule;
+          if (candidate && typeof candidate.initializeDatabase === 'function' && !candidate.initialized) {
+            await candidate.initializeDatabase();
+          }
+          dbWrapper = candidate;
+        }
+      } catch (err) {
+        logger.warn('Database initialization failed, falling back to wrapper singleton:', err?.message || err);
+        const wrapperModule = await import('./utils/database/wrapper.js');
+        const candidate = wrapperModule.db ?? wrapperModule.default ?? wrapperModule;
+        if (candidate && typeof candidate.initializeDatabase === 'function' && !candidate.initialized) {
+          try { await candidate.initializeDatabase(); } catch (e) { /* ignore */ }
+        }
+        dbWrapper = candidate;
+      }
+
+      // Ensure we always set this.db to the wrapper object (it must implement getStatus/get/set/get etc.)
+      this.db = dbWrapper;
+
+      // Defensive check for getStatus presence
+      const dbStatus = (this.db && typeof this.db.getStatus === 'function')
+        ? this.db.getStatus()
+        : { isDegraded: true, connectionType: 'none', degradedReason: 'DB_NOT_INITIALIZED' };
+
       if (dbStatus.isDegraded) {
         logger.warn('');
         logger.warn('╔═══════════════════════════════════════════════════════╗');
