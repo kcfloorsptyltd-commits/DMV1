@@ -132,6 +132,33 @@ export function createRemovalApprovalRow(userId) {
     );
 }
 
+export function createLinkApprovalEmbed(userId, osrsUsername, requestedAt) {
+    return createEmbed({
+        title: '📋 RSN Link Request',
+        description: `<@${userId}> is requesting to link **${osrsUsername}**`,
+        color: 'warning',
+        fields: [
+            { name: 'OSRS Username', value: osrsUsername, inline: true },
+            { name: 'Discord User', value: `<@${userId}>`, inline: true },
+            { name: 'Requested At', value: `<t:${Math.floor(new Date(requestedAt).getTime() / 1000)}:F>`, inline: false },
+        ],
+    });
+}
+
+export function createRemovalApprovalEmbed(userId, osrsUsername, requestedAt, reason) {
+    return createEmbed({
+        title: '📋 RSN Removal Request',
+        description: `<@${userId}> is requesting to remove **${osrsUsername}**`,
+        color: 'warning',
+        fields: [
+            { name: 'OSRS Username', value: osrsUsername, inline: true },
+            { name: 'Discord User', value: `<@${userId}>`, inline: true },
+            { name: 'Requested At', value: `<t:${Math.floor(new Date(requestedAt).getTime() / 1000)}:F>`, inline: false },
+            ...(reason ? [{ name: 'Reason', value: reason, inline: false }] : []),
+        ],
+    });
+}
+
 export function createFightChallengeEmbed(fight) {
     return createEmbed({
         title: 'OSRS Fight Challenge',
