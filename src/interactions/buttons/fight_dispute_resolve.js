@@ -1,5 +1,6 @@
 import { MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { createEmbed, errorEmbed } from '../../utils/embeds.js';
+import { formatCurrency } from '../../utils/economy.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { resolveDisputeFight } from '../../services/osrsStakingService.js';
 import { getFight } from '../../utils/database/fights.js';
@@ -40,8 +41,8 @@ async function notifyUser(client, userId, content) {
 function buildOutcomeLines(fight, resolution) {
     if (resolution === 'refund') {
         return [
-            `<@${fight.challenger_id}> received: ${fight.amount.toLocaleString()} gp`,
-            `<@${fight.opponent_id}> received: ${fight.amount.toLocaleString()} gp`,
+            `<@${fight.challenger_id}> received: ${formatCurrency(fight.amount)}`,
+            `<@${fight.opponent_id}> received: ${formatCurrency(fight.amount)}`,
         ];
     }
 
@@ -49,8 +50,8 @@ function buildOutcomeLines(fight, resolution) {
     const opponentAmount = resolution === 'opponent' ? fight.amount * 2 : 0;
 
     return [
-        `<@${fight.challenger_id}> received: ${challengerAmount.toLocaleString()} gp`,
-        `<@${fight.opponent_id}> received: ${opponentAmount.toLocaleString()} gp`,
+        `<@${fight.challenger_id}> received: ${formatCurrency(challengerAmount)}`,
+        `<@${fight.opponent_id}> received: ${formatCurrency(opponentAmount)}`,
     ];
 }
 

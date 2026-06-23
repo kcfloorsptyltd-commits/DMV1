@@ -270,12 +270,15 @@ export async function resolveDisputeFight(client, fightId, resolution, resolvedB
         resolvedFight.resolutionSource = 'staff_refund';
     }
 
-    resolvedFight.resolutionChoice = resolution;
-    resolvedFight.resolvedBy = resolvedBy;
-    resolvedFight.resolved_at = new Date().toISOString();
+    const finalizedFight = {
+        ...resolvedFight,
+        resolutionChoice: resolution,
+        resolvedBy,
+        resolved_at: new Date().toISOString(),
+    };
 
-    await saveFight(client, resolvedFight);
-    return resolvedFight;
+    await saveFight(client, finalizedFight);
+    return finalizedFight;
 }
 
 export async function resolveFightFromWebhook(client, guildId, killerName, victimName) {
