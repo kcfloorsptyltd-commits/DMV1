@@ -13,9 +13,9 @@ import {
     saveFight,
     updateFightStatus,
 } from '../utils/database/fights.js';
-import { getOsrsLink, getOsrsLinkByUsername } from '../utils/database/osrs.js';
+import { getApprovedOsrsLink, getOsrsLinkByUsername } from '../utils/database/osrs.js';
 
-const TEN_MINUTES_MS = 10 * 60 * 1000;
+const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
 function ensurePositiveStake(amount) {
     if (!Number.isFinite(amount) || amount <= 0 || !Number.isSafeInteger(amount)) {
@@ -80,18 +80,18 @@ export async function handleFightChallenge(client, guildId, challengerId, oppone
     }
 
     const [challengerLink, opponentLink, challengerWallet, opponentWallet] = await Promise.all([
-        getOsrsLink(client, guildId, challengerId),
-        getOsrsLink(client, guildId, opponentId),
+        getApprovedOsrsLink(client, guildId, challengerId),
+        getApprovedOsrsLink(client, guildId, opponentId),
         getEconomyData(client, guildId, challengerId),
         getEconomyData(client, guildId, opponentId),
     ]);
 
     if (!challengerLink) {
-        throw new Error('You need to link your OSRS username first with /link-osrs.');
+        throw new Error('You need to link your OSRS username first with /link-osrs (requires admin approval).');
     }
 
     if (!opponentLink) {
-        throw new Error('That member needs to link their OSRS username before they can fight.');
+        throw new Error('That member needs an approved linked OSRS username before they can fight.');
     }
 
     const existingFight = await findOpenFightBetween(client, guildId, challengerId, opponentId);
@@ -157,7 +157,7 @@ export async function handleFightAccept(client, guildId, fightId, userId) {
 
     return updateFightStatus(client, fight.id, FIGHT_STATUSES.ACTIVE, undefined, {
         acceptedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + TEN_MINUTES_MS).toISOString(),
+        expiresAt: new Date(Date.now() + FIVE_MINUTES_MS).toISOString(),
     });
 }
 
@@ -192,6 +192,55 @@ export async function handleFightReport(client, guildId, reporterId, winnerId, f
     return fight;
 }
 
+export async function handleFightResult(client, guildId, userId, confirmation, fightId = null) {
+    if (confirmation !== 'accept' && confirmation !== 'decline') {
+        throw new Error('Invalid confirmation. Use "accept" (you won) or "decline" (you lost).');
+    }
+
+    const fight = await findUserFight(client, guildId, userId, fightId, [FIGHT_STATUSES.ACTIVE]);
+
+    if (isFightExpired(fight)) {
+        const refunded = await refundFight(client, fight.id);
+        throw new Error('That fight has expired. Both stakes have been refunded.');
+    }
+
+    const isChallenger = fight.challenger_id === userId;
+    const confirmField = isChallenger ? 'challengerConfirmed' : 'opponentConfirmed';
+
+    if (fight[confirmField] !== null) {
+        throw new Error('You have already submitted your fight result confirmation.');
+    }
+
+    fight[confirmField] = confirmation;
+    await saveFight(client, fight);
+
+    const challengerConfirmed = fight.challengerConfirmed;
+    const opponentConfirmed = fight.opponentConfirmed;
+
+    if (challengerConfirmed === null || opponentConfirmed === null) {
+        return { fight, outcome: 'waiting' };
+    }
+
+    if (challengerConfirmed === 'decline' && opponentConfirmed === 'decline') {
+        const refunded = await refundFight(client, fight.id);
+        return { fight: refunded, outcome: 'refunded' };
+    }
+
+    const challengerWon = challengerConfirmed === 'accept' && opponentConfirmed === 'decline';
+    const opponentWon = challengerConfirmed === 'decline' && opponentConfirmed === 'accept';
+
+    if (challengerWon || opponentWon) {
+        const winnerId = challengerWon ? fight.challenger_id : fight.opponent_id;
+        const resolved = await payoutFightWinner(client, fight.id, winnerId, {
+            source: 'dual_confirmation',
+        });
+        return { fight: resolved, outcome: 'resolved', winnerId };
+    }
+
+    const disputed = await updateFightStatus(client, fight.id, FIGHT_STATUSES.TICKET_REQUIRED, null, {});
+    return { fight: disputed, outcome: 'dispute' };
+}
+
 export async function resolveFightFromWebhook(client, guildId, killerName, victimName) {
     const [killerLink, victimLink] = await Promise.all([
         getOsrsLinkByUsername(client, guildId, killerName),
@@ -207,10 +256,32 @@ export async function resolveFightFromWebhook(client, guildId, killerName, victi
         return null;
     }
 
-    return payoutFightWinner(client, fight.id, killerLink.userId, {
-        source: 'webhook',
-        reported_winner: fight.reported_winner,
-    });
+    const isKillerChallenger = fight.challenger_id === killerLink.userId;
+    const killerConfirmField = isKillerChallenger ? 'challengerConfirmed' : 'opponentConfirmed';
+    const victimConfirmField = isKillerChallenger ? 'opponentConfirmed' : 'challengerConfirmed';
+
+    // Detect conflict: if the victim previously confirmed "accept" (claimed they won), that's a dispute
+    if (fight[victimConfirmField] === 'accept') {
+        fight[killerConfirmField] = 'accept';
+        await saveFight(client, fight);
+        const disputed = await updateFightStatus(client, fight.id, FIGHT_STATUSES.TICKET_REQUIRED, null, {});
+        return { fight: disputed, outcome: 'dispute' };
+    }
+
+    // Auto-confirm killer as winner
+    fight[killerConfirmField] = 'accept';
+    await saveFight(client, fight);
+
+    // If victim has already confirmed their loss, resolve immediately
+    if (fight[victimConfirmField] === 'decline') {
+        const resolved = await payoutFightWinner(client, fight.id, killerLink.userId, {
+            source: 'webhook',
+        });
+        return { fight: resolved, outcome: 'resolved', winnerId: killerLink.userId };
+    }
+
+    // Otherwise, save webhook confirmation and wait for victim's confirmation
+    return { fight, outcome: 'waiting' };
 }
 
 export async function expirePendingFights(client) {
@@ -218,6 +289,10 @@ export async function expirePendingFights(client) {
     const results = [];
 
     for (const fight of expiredFights) {
+        if (fight.status === FIGHT_STATUSES.TICKET_REQUIRED) {
+            continue;
+        }
+
         let resolvedFight = null;
 
         if (fight.status === FIGHT_STATUSES.ACTIVE && fight.reported_winner) {

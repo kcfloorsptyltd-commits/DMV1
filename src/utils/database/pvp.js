@@ -66,9 +66,16 @@ export async function recordPvpKill(guildId, killerName, victimName) {
         }
         await db.set(recentKey, recentData);
 
-        const resolvedFight = await resolveFightFromWebhook({ db }, guildId, killerName, victimName);
-        if (resolvedFight?.winner_id) {
-            logger.info(`[PVP] Resolved OSRS fight ${resolvedFight.id} from webhook kill in guild ${guildId}`);
+        const webhookResult = await resolveFightFromWebhook({ db }, guildId, killerName, victimName);
+        if (webhookResult) {
+            const { fight, outcome } = webhookResult;
+            if (outcome === 'resolved') {
+                logger.info(`[PVP] Resolved OSRS fight ${fight.id} from webhook kill in guild ${guildId}`);
+            } else if (outcome === 'dispute') {
+                logger.warn(`[PVP] Fight ${fight.id} in guild ${guildId} entered dispute state from webhook kill — conflicting confirmations`);
+            } else if (outcome === 'waiting') {
+                logger.info(`[PVP] Fight ${fight.id} in guild ${guildId}: webhook confirmed killer, waiting for opponent confirmation`);
+            }
         }
 
         logger.info(`[PVP] Recorded kill: ${killerName} defeated ${victimName} in guild ${guildId}`);

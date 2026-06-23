@@ -6,9 +6,10 @@ export const FIGHT_STATUSES = {
     ACTIVE: 'active',
     COMPLETED: 'completed',
     CANCELLED: 'cancelled',
+    TICKET_REQUIRED: 'ticket_required',
 };
 
-const TEN_MINUTES_MS = 10 * 60 * 1000;
+const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
 function getFightIdParts(fightId) {
     if (typeof fightId !== 'string') {
@@ -43,6 +44,9 @@ function withDefaults(record) {
         channelId: null,
         challengerOsrsUsername: null,
         opponentOsrsUsername: null,
+        challengerConfirmed: null,
+        opponentConfirmed: null,
+        ticketId: null,
         ...record,
     };
 }
@@ -55,7 +59,7 @@ export async function createFight(client, guildId, challengerId, opponentId, amo
     const sequence = await client.db.increment(getFightCounterKey(guildId), 1);
     const now = new Date();
     const fightId = `${guildId}_${sequence}`;
-    const expiresAt = new Date(now.getTime() + TEN_MINUTES_MS).toISOString();
+    const expiresAt = new Date(now.getTime() + FIVE_MINUTES_MS).toISOString();
     const record = withDefaults({
         id: fightId,
         guildId,
@@ -164,7 +168,7 @@ export async function updateFightStatus(client, fightId, status, winner = null, 
         updated.reported_winner = winner;
     }
 
-    if (status === FIGHT_STATUSES.COMPLETED || status === FIGHT_STATUSES.CANCELLED) {
+    if (status === FIGHT_STATUSES.COMPLETED || status === FIGHT_STATUSES.CANCELLED || status === FIGHT_STATUSES.TICKET_REQUIRED) {
         updated.resolved_at = extra.resolved_at || new Date().toISOString();
     }
 

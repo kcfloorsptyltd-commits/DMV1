@@ -98,3 +98,7 @@ export function getFightKey(guildId, fightId) {
 export function getOsrsLinksPrefix(guildId) {
     return buildOsrsLinkPrefix(guildId);
 }
+
+export function getOsrsPendingRemovalKey(guildId, userId) {
+    return `guild:${guildId}:osrs:pending_removal:${userId}`;
+}
