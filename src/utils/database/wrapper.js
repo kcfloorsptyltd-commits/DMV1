@@ -157,4 +157,9 @@ async function setInDb(key, value, ttl = null) {
     return db.set(key, value, ttl);
 }
 
-export { DatabaseWrapper, db, initializeDatabase, getFromDb, setInDb };
+async function deleteFromDb(key) {
+    if (!db.initialized) await db.initialize();
+    return db.delete(key);
+}
+
+export { DatabaseWrapper, db, initializeDatabase, getFromDb, setInDb, deleteFromDb };
