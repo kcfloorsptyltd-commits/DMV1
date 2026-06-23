@@ -82,15 +82,18 @@ export function createPvpEventHandler({
   return async function handlePvpEventWebhook(req, res) {
     const ip = req.ip ?? 'unknown';
 
-    const providedToken = extractPvpEventAuthToken(req);
+    // Skip token validation if no token is configured (for Dink plugin compatibility)
+    if (token) {
+      const providedToken = extractPvpEventAuthToken(req);
 
-    if (!pvpEventTokensMatch(token, providedToken)) {
-      logger.warn('[PVP] Rejected PvP webhook request due to failed authentication', {
-        event: 'api.pvp_event.auth_failed',
-        guildId: normalizePvpEventGuildId(req.body?.guildId) ?? normalizePvpEventGuildId(defaultGuildId),
-        ip,
-      });
-      return res.status(401).json({ error: 'Unauthorized' });
+      if (!pvpEventTokensMatch(token, providedToken)) {
+        logger.warn('[PVP] Rejected PvP webhook request due to failed authentication', {
+          event: 'api.pvp_event.auth_failed',
+          guildId: normalizePvpEventGuildId(req.body?.guildId) ?? normalizePvpEventGuildId(defaultGuildId),
+          ip,
+        });
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
     }
 
     const killer = normalizePvpEventName(req.body?.killer);
