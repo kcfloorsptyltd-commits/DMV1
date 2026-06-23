@@ -1,32 +1,16 @@
-import { MessageFlags, PermissionFlagsBits } from 'discord.js';
+import { MessageFlags } from 'discord.js';
 import { createEmbed, errorEmbed } from '../../utils/embeds.js';
 import { formatCurrency } from '../../utils/economy.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { resolveDisputeFight } from '../../services/osrsStakingService.js';
 import { getFight } from '../../utils/database/fights.js';
 import {
+    createFightParticipantMentions,
     createFightDisputeResolutionRow,
     createFightDisputeResolvedEmbed,
 } from '../../utils/osrsStakingPresentation.js';
 import { logger } from '../../utils/logger.js';
-
-const ADMIN_ROLES = ['Owner', 'Administrator', 'Support Staff', 'Admin', 'Mod', 'Moderator'];
-
-async function isAuthorizedAdmin(interaction) {
-    if (!interaction.guild) return false;
-    const member = interaction.member;
-    if (!member) return false;
-
-    if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;
-    if (interaction.guild.ownerId === interaction.user.id) return true;
-
-    const memberRoles = member.roles?.cache;
-    if (!memberRoles) return false;
-
-    return memberRoles.some((role) => ADMIN_ROLES.some((adminRole) =>
-        role.name.toLowerCase().includes(adminRole.toLowerCase()),
-    ));
-}
+import { isAuthorizedOsrsAdmin } from '../../utils/osrsAdminAuth.js';
 
 async function notifyUser(client, userId, content) {
     try {
@@ -82,7 +66,7 @@ export default {
         if (!deferSuccess) return;
 
         try {
-            if (!(await isAuthorizedAdmin(interaction))) {
+            if (!(await isAuthorizedOsrsAdmin(interaction))) {
                 await InteractionHelper.safeEditReply(interaction, {
                     embeds: [errorEmbed('You do not have permission to resolve fight disputes. Required: Owner, Administrator, or Support Staff role.')],
                 });
@@ -113,7 +97,7 @@ export default {
 
             if (interaction.channel?.send) {
                 await interaction.channel.send({
-                    content: `<@${fight.challenger_id}> <@${fight.opponent_id}>`,
+                    content: createFightParticipantMentions(fight),
                     embeds: [createFightDisputeResolvedEmbed(fight, interaction.user.id, resolution)],
                     allowedMentions: { users: [fight.challenger_id, fight.opponent_id], roles: [] },
                 });

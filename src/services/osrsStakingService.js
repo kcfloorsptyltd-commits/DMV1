@@ -266,8 +266,10 @@ export async function resolveDisputeFight(client, fightId, resolution, resolvedB
             source: 'staff_resolution',
         });
     } else {
-        resolvedFight = await refundFight(client, fight.id);
-        resolvedFight.resolutionSource = 'staff_refund';
+        resolvedFight = {
+            ...await refundFight(client, fight.id),
+            resolutionSource: 'staff_refund',
+        };
     }
 
     const finalizedFight = {

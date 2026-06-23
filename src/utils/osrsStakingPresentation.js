@@ -14,6 +14,10 @@ function formatFightConfirmation(confirmation) {
     return '⏳ Pending';
 }
 
+export function createFightParticipantMentions(fight) {
+    return `<@${fight.challenger_id}> <@${fight.opponent_id}>`;
+}
+
 export function createFightActionRow(fightId, disabled = false) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()

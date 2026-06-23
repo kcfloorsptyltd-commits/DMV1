@@ -8,6 +8,7 @@ import { createTicket } from '../../services/ticket.js';
 import { getFight, updateFightStatus, FIGHT_STATUSES } from '../../utils/database/fights.js';
 import { saveFight } from '../../utils/database/fights.js';
 import {
+    createFightParticipantMentions,
     createFightConfirmedEmbed,
     createFightCompletedEmbed,
     createFightCancelledEmbed,
@@ -56,7 +57,7 @@ async function createDisputeTicket(client, guild, member, fight) {
             });
 
             await result.channel.send({
-                content: `<@${fight.challenger_id}> <@${fight.opponent_id}>`,
+                content: createFightParticipantMentions(fight),
                 embeds: [createFightDisputeTicketEmbed(fight)],
                 components: [createFightDisputeResolutionRow(fight.id)],
                 allowedMentions: { users: fighterIds, roles: [] },
