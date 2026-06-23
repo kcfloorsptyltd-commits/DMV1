@@ -5,6 +5,8 @@ import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHan
 import { logger } from '../../utils/logger.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
+const MONEY_EMOJI = '💰';
+
 export default {
     data: new SlashCommandBuilder()
         .setName('balance')
@@ -51,7 +53,7 @@ export default {
 
         const embed = createEmbed({
             title: `${targetUser.username}'s GP Wallet`,
-            description: `${formatCurrency(wallet, { short: true })}`,
+            description: `${MONEY_EMOJI} ${formatCurrency(wallet, { short: true })}`,
         })
             .setFooter({ text: `Requested by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
 
