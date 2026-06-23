@@ -9,7 +9,7 @@ const EMBED_DESCRIPTION_LIMIT = 4096;
 
 export default {
     data: new SlashCommandBuilder()
-    .setName("fight")
+    .setName("fight-sim")
     .setDescription("Starts a simulated 1v1 text-based battle.")
     .addUserOption((option) =>
       option
