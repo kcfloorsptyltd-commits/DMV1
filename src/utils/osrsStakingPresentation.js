@@ -79,8 +79,8 @@ export function createFightResultConfirmationRow(fightId, disabled = false) {
             .setStyle(ButtonStyle.Success)
             .setDisabled(disabled),
         new ButtonBuilder()
-            .setCustomId(`fight_result:decline:${fightId}`)
-            .setLabel('❌ Decline')
+            .setCustomId(`fight_result:dispute:${fightId}`)
+            .setLabel('🚨 Dispute')
             .setStyle(ButtonStyle.Danger)
             .setDisabled(disabled),
     );
@@ -132,33 +132,6 @@ export function createRemovalApprovalRow(userId) {
     );
 }
 
-export function createLinkApprovalEmbed(userId, osrsUsername, requestedAt) {
-    return createEmbed({
-        title: '📋 RSN Link Request',
-        description: `<@${userId}> is requesting to link **${osrsUsername}**`,
-        color: 'warning',
-        fields: [
-            { name: 'OSRS Username', value: osrsUsername, inline: true },
-            { name: 'Discord User', value: `<@${userId}>`, inline: true },
-            { name: 'Requested At', value: `<t:${Math.floor(new Date(requestedAt).getTime() / 1000)}:F>`, inline: false },
-        ],
-    });
-}
-
-export function createRemovalApprovalEmbed(userId, osrsUsername, requestedAt, reason) {
-    return createEmbed({
-        title: '📋 RSN Removal Request',
-        description: `<@${userId}> is requesting to remove **${osrsUsername}**`,
-        color: 'warning',
-        fields: [
-            { name: 'OSRS Username', value: osrsUsername, inline: true },
-            { name: 'Discord User', value: `<@${userId}>`, inline: true },
-            { name: 'Requested At', value: `<t:${Math.floor(new Date(requestedAt).getTime() / 1000)}:F>`, inline: false },
-            ...(reason ? [{ name: 'Reason', value: reason, inline: false }] : []),
-        ],
-    });
-}
-
 export function createFightChallengeEmbed(fight) {
     return createEmbed({
         title: 'OSRS Fight Challenge',
@@ -206,10 +179,15 @@ export function createFightCancelledEmbed(fight, reason) {
 }
 
 export function createFightConfirmedEmbed(fight, confirmerId, confirmation) {
-    const label = confirmation === 'accept' ? '✅ Win Claimed' : '❌ Loss Accepted';
+    let label = '🚨 Result Disputed';
+    if (confirmation === 'accept') {
+        label = !fight.reported_winner || fight.reported_winner === confirmerId
+            ? '✅ Win Reported'
+            : '✅ Result Accepted';
+    }
     return createEmbed({
         title: 'Fight Result Recorded',
-        description: `<@${confirmerId}> has confirmed: **${label}**.\nThe other fighter can use the buttons below, \`/fight-results\`, or the Dink webhook to finish the outcome.`,
+        description: `<@${confirmerId}> has submitted: **${label}**.\nThe other fighter can use the buttons below, \`/fight-results\`, or the Dink webhook to finish the outcome.`,
         color: 'info',
         fields: [
             { name: 'Fight ID', value: fight.id, inline: true },
