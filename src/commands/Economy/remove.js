@@ -59,7 +59,7 @@ export default {
         const errMsg = result && result.error ? result.error : 'Failed to remove money';
         let body = errMsg;
         if (result && result.current !== undefined) {
-          body += ` (current: ${MONEY_EMOJI} ${formatCurrency(result.current, { short: true })}${result.required ? `, required: ${MONEY_EMOJI} ${formatCurrency(result.required, { short: true })}` : ''})`;
+          body += ` (current: ${MONEY_EMOJI} ${formatCurrency(result.current, { short: true, noSymbol: true })} gp${result.required ? `, required: ${MONEY_EMOJI} ${formatCurrency(result.required, { short: true, noSymbol: true })} gp` : ''})`;
         }
         await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed(body)] });
         return;
@@ -70,12 +70,12 @@ export default {
 
       const embed = createEmbed({
         title: 'Balance Updated',
-        description: `Removed ${MONEY_EMOJI} ${formatCurrency(amountStr, { short: true })} from ${target.username}'s ${fieldName}`,
+        description: `Removed ${MONEY_EMOJI} ${formatCurrency(amountStr, { short: true, noSymbol: true })} gp from ${target.username}'s ${fieldName}`,
       })
         .addFields(
           { name: 'User', value: `${target.tag} (${target.id})`, inline: true },
-          { name: `Before (${fieldName})`, value: `${MONEY_EMOJI} ${formatCurrency((type === 'bank' ? before.bank : before.wallet) || 0, { short: true })}`, inline: true },
-          { name: `After (${fieldName})`, value: `${MONEY_EMOJI} ${formatCurrency(afterValue || 0, { short: true })}`, inline: true }
+          { name: `Before (${fieldName})`, value: `${MONEY_EMOJI} ${formatCurrency((type === 'bank' ? before.bank : before.wallet) || 0, { short: true, noSymbol: true })} gp`, inline: true },
+          { name: `After (${fieldName})`, value: `${MONEY_EMOJI} ${formatCurrency(afterValue || 0, { short: true, noSymbol: true })} gp`, inline: true }
         )
         .setFooter({ text: `Requested by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
 

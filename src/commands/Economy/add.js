@@ -66,12 +66,12 @@ export default {
 
       const embed = createEmbed({
         title: 'Balance Updated',
-        description: `Added ${MONEY_EMOJI} ${formatCurrency(amountStr, { short: true })} to ${target.username}'s ${fieldName}`,
+        description: `Added ${MONEY_EMOJI} ${formatCurrency(amountStr, { short: true, noSymbol: true })} gp to ${target.username}'s ${fieldName}`,
       })
         .addFields(
           { name: 'User', value: `${target.tag} (${target.id})`, inline: true },
-          { name: `Before (${fieldName})`, value: `${MONEY_EMOJI} ${formatCurrency((type === 'bank' ? before.bank : before.wallet) || 0, { short: true })}`, inline: true },
-          { name: `After (${fieldName})`, value: `${MONEY_EMOJI} ${formatCurrency(afterValue || 0, { short: true })}`, inline: true }
+          { name: `Before (${fieldName})`, value: `${MONEY_EMOJI} ${formatCurrency((type === 'bank' ? before.bank : before.wallet) || 0, { short: true, noSymbol: true })} gp`, inline: true },
+          { name: `After (${fieldName})`, value: `${MONEY_EMOJI} ${formatCurrency(afterValue || 0, { short: true, noSymbol: true })} gp`, inline: true }
         )
         .setFooter({ text: `Requested by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
 
