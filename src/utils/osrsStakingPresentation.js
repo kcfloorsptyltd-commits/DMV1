@@ -132,6 +132,38 @@ export function createRemovalApprovalRow(userId) {
     );
 }
 
+export function createLinkApprovalEmbed(userId, osrsUsername, requestedAt) {
+    return createEmbed({
+        title: '🔗 RSN Link Request — Admin Approval Required',
+        description: `<@${userId}> has requested to link an OSRS username to their Discord account.\n\nPlease review and approve or decline below.`,
+        color: 'warning',
+        fields: [
+            { name: 'Discord User', value: `<@${userId}>`, inline: true },
+            { name: 'OSRS Username', value: osrsUsername, inline: true },
+            { name: 'Requested At', value: `<t:${Math.floor(new Date(requestedAt).getTime() / 1000)}:F>`, inline: false },
+        ],
+    });
+}
+
+export function createRemovalApprovalEmbed(userId, osrsUsername, requestedAt, reason = null) {
+    const fields = [
+        { name: 'Discord User', value: `<@${userId}>`, inline: true },
+        { name: 'OSRS Username', value: osrsUsername, inline: true },
+        { name: 'Requested At', value: `<t:${Math.floor(new Date(requestedAt).getTime() / 1000)}:F>`, inline: false },
+    ];
+
+    if (reason) {
+        fields.push({ name: 'Reason', value: reason, inline: false });
+    }
+
+    return createEmbed({
+        title: '🗑️ RSN Removal Request — Admin Approval Required',
+        description: `<@${userId}> has requested to unlink their OSRS username from their Discord account.\n\nPlease review and approve or decline below.`,
+        color: 'warning',
+        fields,
+    });
+}
+
 export function createFightChallengeEmbed(fight) {
     return createEmbed({
         title: 'OSRS Fight Challenge',
