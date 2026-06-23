@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { createEmbed, errorEmbed, successEmbed } from '../../utils/embeds.js';
+import { createEmbed, errorEmbed } from '../../utils/embeds.js';
 import { getEconomyData, addMoney, formatCurrency } from '../../utils/economy.js';
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -13,7 +13,7 @@ export default {
         .setName('balance')
         .setDescription("Add money to a user's balance")
         .addUserOption(opt => opt.setName('user').setDescription('User to update').setRequired(true))
-        .addNumberOption(opt => opt.setName('amount').setDescription('Amount to add').setRequired(true))
+        .addStringOption(opt => opt.setName('amount').setDescription('Amount to add (e.g., 100m)').setRequired(true))
         .addStringOption(opt =>
           opt
             .setName('type')
@@ -40,7 +40,7 @@ export default {
 
     if (sub === 'balance') {
       const target = interaction.options.getUser('user', true);
-      const amount = interaction.options.getNumber('amount', true);
+      const amountStr = interaction.options.getString('amount', true);
       const type = interaction.options.getString('type') || 'wallet';
       const guildId = interaction.guildId;
 
@@ -49,14 +49,9 @@ export default {
         return;
       }
 
-      if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) {
-        await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed('Please provide a valid amount greater than zero.')] });
-        return;
-      }
-
       const before = await getEconomyData(client, guildId, target.id) || { wallet: 0, bank: 0 };
 
-      const result = await addMoney(client, guildId, target.id, amount, type);
+      const result = await addMoney(client, guildId, target.id, amountStr, type, { bypassLimits: true });
 
       if (!result || result.success === false) {
         const errMsg = result && result.error ? result.error : 'Failed to add money';
@@ -69,12 +64,12 @@ export default {
 
       const embed = createEmbed({
         title: 'Balance Updated',
-        description: `Added ${formatCurrency(Number(amount), { short: true })} to ${target.username}'s ${fieldName}`,
+        description: `Added ${formatCurrency(amountStr, { short: true, noSymbol: true })} to ${target.username}'s ${fieldName}`,
       })
         .addFields(
           { name: 'User', value: `${target.tag} (${target.id})`, inline: true },
-          { name: `Before (${fieldName})`, value: `${formatCurrency((type === 'bank' ? before.bank : before.wallet) || 0, { short: true })}`, inline: true },
-          { name: `After (${fieldName})`, value: `${formatCurrency(afterValue || 0, { short: true })}`, inline: true }
+          { name: `Before (${fieldName})`, value: `${formatCurrency((type === 'bank' ? before.bank : before.wallet) || 0, { short: true, noSymbol: true })}`, inline: true },
+          { name: `After (${fieldName})`, value: `${formatCurrency(afterValue || 0, { short: true, noSymbol: true })}`, inline: true }
         )
         .setFooter({ text: `Requested by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
 

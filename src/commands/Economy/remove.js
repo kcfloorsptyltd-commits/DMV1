@@ -13,7 +13,7 @@ export default {
         .setName('balance')
         .setDescription("Remove money from a user's balance")
         .addUserOption(opt => opt.setName('user').setDescription('User to update').setRequired(true))
-        .addNumberOption(opt => opt.setName('amount').setDescription('Amount to remove').setRequired(true))
+        .addStringOption(opt => opt.setName('amount').setDescription('Amount to remove (e.g., 50m)').setRequired(true))
         .addStringOption(opt =>
           opt
             .setName('type')
@@ -40,7 +40,7 @@ export default {
 
     if (sub === 'balance') {
       const target = interaction.options.getUser('user', true);
-      const amount = interaction.options.getNumber('amount', true);
+      const amountStr = interaction.options.getString('amount', true);
       const type = interaction.options.getString('type') || 'wallet';
       const guildId = interaction.guildId;
 
@@ -49,21 +49,15 @@ export default {
         return;
       }
 
-      if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) {
-        await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed('Please provide a valid amount greater than zero.')] });
-        return;
-      }
-
       const before = await getEconomyData(client, guildId, target.id) || { wallet: 0, bank: 0 };
 
-      const result = await removeMoney(client, guildId, target.id, amount, type);
+      const result = await removeMoney(client, guildId, target.id, amountStr, type, { bypassLimits: true });
 
       if (!result || result.success === false) {
-        // include friendly details if available (insufficient, current, required, etc.)
         const errMsg = result && result.error ? result.error : 'Failed to remove money';
         let body = errMsg;
         if (result && result.current !== undefined) {
-          body += ` (current: ${formatCurrency(result.current, { short: true })}${result.required ? `, required: ${formatCurrency(result.required, { short: true })}` : ''})`;
+          body += ` (current: ${formatCurrency(result.current, { short: true, noSymbol: true })}${result.required ? `, required: ${formatCurrency(result.required, { short: true, noSymbol: true })}` : ''})`;
         }
         await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed(body)] });
         return;
@@ -74,12 +68,12 @@ export default {
 
       const embed = createEmbed({
         title: 'Balance Updated',
-        description: `Removed ${formatCurrency(Number(amount), { short: true })} from ${target.username}'s ${fieldName}`,
+        description: `Removed ${formatCurrency(amountStr, { short: true, noSymbol: true })} from ${target.username}'s ${fieldName}`,
       })
         .addFields(
           { name: 'User', value: `${target.tag} (${target.id})`, inline: true },
-          { name: `Before (${fieldName})`, value: `${formatCurrency((type === 'bank' ? before.bank : before.wallet) || 0, { short: true })}`, inline: true },
-          { name: `After (${fieldName})`, value: `${formatCurrency(afterValue || 0, { short: true })}`, inline: true }
+          { name: `Before (${fieldName})`, value: `${formatCurrency((type === 'bank' ? before.bank : before.wallet) || 0, { short: true, noSymbol: true })}`, inline: true },
+          { name: `After (${fieldName})`, value: `${formatCurrency(afterValue || 0, { short: true, noSymbol: true })}`, inline: true }
         )
         .setFooter({ text: `Requested by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
 
