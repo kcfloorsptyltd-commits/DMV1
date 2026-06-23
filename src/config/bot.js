@@ -175,6 +175,33 @@ export const botConfig = {
   // TICKET SYSTEM
   // =========================
   tickets: {
+    priorities: {
+      none: {
+        emoji: '🎫',
+        label: 'None',
+        color: '#95A5A6',
+      },
+      low: {
+        emoji: '🔵',
+        label: 'Low',
+        color: '#3498db',
+      },
+      medium: {
+        emoji: '🟡',
+        label: 'Medium',
+        color: '#2ecc71',
+      },
+      high: {
+        emoji: '🔴',
+        label: 'High',
+        color: '#f1c40f',
+      },
+      urgent: {
+        emoji: '🚨',
+        label: 'Urgent',
+        color: '#e74c3c',
+      },
+    },
     defaults: {
       name: "{name} Counter",
       description: "Server {name} counter",
