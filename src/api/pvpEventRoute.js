@@ -82,8 +82,9 @@ export function createPvpEventHandler({
   return async function handlePvpEventWebhook(req, res) {
     const ip = req.ip ?? 'unknown';
 
-    // Log incoming payload for debugging
-    logger.debug(`[PVP] Webhook received payload:`, JSON.stringify(req.body));
+    // Log incoming payload for debugging (using info level so it shows)
+    logger.info(`[PVP] Webhook received payload:`, JSON.stringify(req.body));
+    logger.info(`[PVP] Webhook body keys:`, Object.keys(req.body || {}));
 
     // Skip token validation if no token is configured (for Dink plugin compatibility)
     if (token) {
