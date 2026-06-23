@@ -90,7 +90,13 @@ export function createFightCompletedEmbed(fight) {
 
 export function formatFightSummaryLine(fight, userId) {
     const opponentId = fight.challenger_id === userId ? fight.opponent_id : fight.challenger_id;
-    const statusLabel = fight.status === 'active' ? 'Active' : fight.status === 'pending' ? 'Pending' : fight.status === 'completed' ? 'Won/Lost' : 'Cancelled';
+    const statusLabels = {
+        active: 'Active',
+        pending: 'Pending',
+        completed: 'Won/Lost',
+        cancelled: 'Cancelled',
+    };
+    const statusLabel = statusLabels[fight.status] || fight.status;
     const outcome = fight.winner_id
         ? (fight.winner_id === userId ? ' — You won' : ' — You lost')
         : '';

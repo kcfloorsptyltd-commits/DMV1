@@ -21,11 +21,13 @@ export default {
         if (!deferred) return;
 
         try {
+            const fightId = interaction.options.getString('fight-id');
+            const userId = interaction.user.id;
             const fight = await handleFightDecline(
                 client,
                 interaction.guildId,
-                interaction.options.getString('fight-id'),
-                interaction.user.id,
+                fightId,
+                userId,
             );
 
             await InteractionHelper.safeEditReply(interaction, {

@@ -155,7 +155,7 @@ export async function handleFightAccept(client, guildId, fightId, userId) {
         throw new Error('That fight challenge expired before it was accepted.');
     }
 
-    return updateFightStatus(client, fight.id, FIGHT_STATUSES.ACTIVE, fight.reported_winner, {
+    return updateFightStatus(client, fight.id, FIGHT_STATUSES.ACTIVE, undefined, {
         acceptedAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + TEN_MINUTES_MS).toISOString(),
     });
@@ -226,8 +226,8 @@ export async function expirePendingFights(client) {
                 reported_winner: fight.reported_winner,
             });
             await Promise.allSettled([
-                notifyUser(client, fight.challenger_id, `Your OSRS fight ${fight.id} was auto-resolved in favour of <@${fight.reported_winner}> after time expired.`),
-                notifyUser(client, fight.opponent_id, `Your OSRS fight ${fight.id} was auto-resolved in favour of <@${fight.reported_winner}> after time expired.`),
+                notifyUser(client, fight.challenger_id, `Your OSRS fight ${fight.id} was auto-resolved in favor of <@${fight.reported_winner}> after time expired.`),
+                notifyUser(client, fight.opponent_id, `Your OSRS fight ${fight.id} was auto-resolved in favor of <@${fight.reported_winner}> after time expired.`),
             ]);
         } else {
             resolvedFight = await refundFight(client, fight.id);

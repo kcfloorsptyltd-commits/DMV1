@@ -59,7 +59,8 @@ export async function linkOsrsUsername(client, guildId, userId, osrsUsername) {
     }
 
     const existingUserLink = await getOsrsLink(client, guildId, userId);
-    if (existingUserLink?.osrsUsername && existingUserLink.osrsUsername.toLowerCase() !== normalized.toLowerCase()) {
+    const existingNormalized = normalizeOsrsUsername(existingUserLink?.osrsUsername);
+    if (existingNormalized && existingNormalized !== normalized) {
         await client.db.delete(getOsrsUsernameKey(guildId, existingUserLink.osrsUsername));
     }
 
