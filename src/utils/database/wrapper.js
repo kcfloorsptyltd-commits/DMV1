@@ -1,6 +1,6 @@
 import { pgDb } from '../postgresDatabase.js';
 import { MemoryStorage } from '../memoryStorage.js';
-import { sqliteDb, SqliteDatabase } from '../sqliteDatabase.js';
+import { sqliteDb } from '../sqliteDatabase.js';
 import { logger } from '../logger.js';
 import { validateGuildConfigOrThrow } from '../schemas.js';
 
@@ -141,4 +141,20 @@ class DatabaseWrapper {
     }
 }
 
-export { DatabaseWrapper };
+const db = new DatabaseWrapper();
+
+async function initializeDatabase() {
+    if (!db.initialized) await db.initialize();
+}
+
+async function getFromDb(key, defaultValue = null) {
+    if (!db.initialized) await db.initialize();
+    return db.get(key, defaultValue);
+}
+
+async function setInDb(key, value, ttl = null) {
+    if (!db.initialized) await db.initialize();
+    return db.set(key, value, ttl);
+}
+
+export { DatabaseWrapper, db, initializeDatabase, getFromDb, setInDb };
