@@ -159,6 +159,9 @@ class TitanBot extends Client {
     const corsOrigin = this.config.api?.cors?.origin || '*';
     const allowedHeaders = this.config.api?.cors?.allowedHeaders || ['Content-Type', 'Authorization'];
     
+    // Trust proxy for Railway
+    app.set('trust proxy', 1);
+    
     app.use((req, res, next) => {
       const allowedOrigins = Array.isArray(corsOrigin) ? corsOrigin : [corsOrigin];
       const origin = req.headers.origin;
@@ -174,6 +177,9 @@ class TitanBot extends Client {
       }
       next();
     });
+
+    // Parse JSON BEFORE rate limiter
+    app.use(express.json({ limit: '16kb' }));
 
     const requestCounts = new Map();
     const windowMs = 60000; 
@@ -201,7 +207,6 @@ class TitanBot extends Client {
 
     app.post(
       '/api/pvp-event',
-      express.json({ limit: '16kb' }),
       rateLimit({
         windowMs: this.config.api?.pvpEvent?.rateLimit?.windowMs || 60_000,
         limit: this.config.api?.pvpEvent?.rateLimit?.max || 30,
