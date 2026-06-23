@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { createEmbed, errorEmbed, successEmbed, infoEmbed, warningEmbed } from '../../utils/embeds.js';
 import { getEconomyData, getMaxBankCapacity, formatCurrency } from '../../utils/economy.js';
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -78,7 +78,6 @@ export default {
                         inline: true,
                     }
                 )
-                .setThumbnail('https://i.imgur.com/7k5X2mH.png')
                 .setFooter({
                     text: `Requested by ${interaction.user.tag}`,
                     iconURL: interaction.user.displayAvatarURL(),
@@ -86,6 +85,17 @@ export default {
 
             logger.info(`[ECONOMY] Balance retrieved`, { userId: targetUser.id, wallet, bank });
 
-            await InteractionHelper.safeEditReply(interaction, { embeds: [embed] });
+            // Clear any thumbnail/image and log the embed JSON for debugging
+            try {
+                const json = embed.toJSON ? embed.toJSON() : {};
+                delete json.thumbnail;
+                delete json.image;
+                const cleaned = new EmbedBuilder(json);
+                logger.debug('Sending embed (balance)', cleaned.toJSON());
+                await InteractionHelper.safeEditReply(interaction, { embeds: [cleaned] });
+            } catch (err) {
+                logger.error('Failed to send cleaned embed for balance', err);
+                await InteractionHelper.safeEditReply(interaction, { embeds: [embed] });
+            }
     }, { command: 'balance' })
 };

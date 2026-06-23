@@ -1,8 +1,9 @@
-import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import { createEmbed, errorEmbed } from '../../utils/embeds.js';
 import { getEconomyData, addMoney, formatCurrency } from '../../utils/economy.js';
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { logger } from '../../utils/logger.js';
 
 // Use Unicode escape to ensure the emoji is preserved in all environments
 const MONEY_EMOJI = '\u{1F4B0}';
@@ -74,10 +75,20 @@ export default {
           { name: `Before (${fieldName})`, value: `${MONEY_EMOJI} ${formatCurrency((type === 'bank' ? before.bank : before.wallet) || 0, { short: true, noSymbol: true })} gp`, inline: true },
           { name: `After (${fieldName})`, value: `${MONEY_EMOJI} ${formatCurrency(afterValue || 0, { short: true, noSymbol: true })} gp`, inline: true }
         )
-        .setThumbnail('https://i.imgur.com/7k5X2mH.png')
         .setFooter({ text: `Requested by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
 
-      await InteractionHelper.safeEditReply(interaction, { embeds: [embed] });
+      // Clear any thumbnail/image and log the final embed JSON for debugging
+      try {
+        const json = embed.toJSON ? embed.toJSON() : {};
+        delete json.thumbnail;
+        delete json.image;
+        const cleaned = new EmbedBuilder(json);
+        logger.debug('Sending embed (add.balance)', cleaned.toJSON());
+        await InteractionHelper.safeEditReply(interaction, { embeds: [cleaned] });
+      } catch (err) {
+        logger.error('Failed to send cleaned embed for add.balance', err);
+        await InteractionHelper.safeEditReply(interaction, { embeds: [embed] });
+      }
     }
   }, { command: 'add' })
 };
