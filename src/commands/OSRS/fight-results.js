@@ -34,7 +34,7 @@ async function createDisputeTicket(client, guild, member, fight) {
 
         const result = await createTicket(guild, member, categoryId, reason);
         if (result.success && result.channel) {
-            const fighterIds = [...new Set([fight.challenger_id, fight.opponent_id].filter(Boolean))];
+            const fighterIds = [fight.challenger_id, fight.opponent_id].filter(Boolean);
             const permissionResults = await Promise.allSettled(
                 fighterIds.map((userId) =>
                     result.channel.permissionOverwrites.create(userId, {

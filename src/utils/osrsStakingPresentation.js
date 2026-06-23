@@ -19,15 +19,24 @@ export function createFightParticipantMentions(fight) {
 }
 
 export function getFightDisputeOutcomeLines(fight, resolution) {
-    const payouts = resolution === 'refund'
-        ? [
+    let payouts = [];
+
+    if (resolution === 'refund') {
+        payouts = [
             { userId: fight.challenger_id, amount: fight.amount },
             { userId: fight.opponent_id, amount: fight.amount },
-        ]
-        : [
-            { userId: fight.challenger_id, amount: resolution === 'challenger' ? fight.amount * 2 : 0 },
-            { userId: fight.opponent_id, amount: resolution === 'opponent' ? fight.amount * 2 : 0 },
         ];
+    } else if (resolution === 'challenger') {
+        payouts = [
+            { userId: fight.challenger_id, amount: fight.amount * 2 },
+            { userId: fight.opponent_id, amount: 0 },
+        ];
+    } else {
+        payouts = [
+            { userId: fight.challenger_id, amount: 0 },
+            { userId: fight.opponent_id, amount: fight.amount * 2 },
+        ];
+    }
 
     return payouts.map(({ userId, amount: payout }) => `• <@${userId}> received: ${formatCurrency(payout)}`);
 }
