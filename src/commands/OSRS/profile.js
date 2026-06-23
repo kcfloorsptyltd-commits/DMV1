@@ -90,9 +90,9 @@ export default {
         const recentActivityRows = buildRecentActivityRows(recentEvents, linkedUsernames, rsnToUserId, 5);
 
         const createdAt = Math.floor(targetUser.createdAt.getTime() / 1000);
-        const discordUsername = targetUser.username || targetUser.globalName || 'Unknown User';
+        const userDisplayName = targetUser.username || targetUser.globalName || 'Unknown User';
         const embed = createEmbed({
-            title: `${discordUsername}'s OSRS Profile`,
+            title: `${userDisplayName}'s OSRS Profile`,
             description: linkedUsernames.length === 0
                 ? '⚠️ No linked OSRS accounts found for this member yet.'
                 : 'Comprehensive staking profile overview.',
@@ -101,7 +101,7 @@ export default {
                 {
                     name: '👤 User Info',
                     value: [
-                        `**Username:** ${discordUsername}`,
+                        `**Username:** ${userDisplayName}`,
                         `**Mention:** ${targetUser}`,
                         `**Created:** <t:${createdAt}:F>`,
                     ].join('\n'),
