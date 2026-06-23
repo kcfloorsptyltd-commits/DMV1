@@ -2,6 +2,18 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { formatCurrency } from './economy.js';
 import { createEmbed } from './embeds.js';
 
+function formatFightConfirmation(confirmation) {
+    if (confirmation === 'accept') {
+        return '✅ Win';
+    }
+
+    if (confirmation === 'decline') {
+        return '❌ Loss';
+    }
+
+    return '⏳ Pending';
+}
+
 export function createFightActionRow(fightId, disabled = false) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -102,6 +114,53 @@ export function createFightConfirmedEmbed(fight, confirmerId, confirmation) {
     });
 }
 
+export function createFightDisputeResolutionRow(fightId, disabled = false) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`fight_dispute_resolve:challenger:${fightId}`)
+            .setLabel('Pay Challenger')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('💰')
+            .setDisabled(disabled),
+        new ButtonBuilder()
+            .setCustomId(`fight_dispute_resolve:opponent:${fightId}`)
+            .setLabel('Pay Opponent')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('💰')
+            .setDisabled(disabled),
+        new ButtonBuilder()
+            .setCustomId(`fight_dispute_resolve:refund:${fightId}`)
+            .setLabel('Refund Both')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('♻️')
+            .setDisabled(disabled),
+    );
+}
+
+export function createFightDisputeTicketEmbed(fight) {
+    return createEmbed({
+        title: '👋 Fight Dispute - Awaiting Staff Resolution',
+        description: [
+            'A dispute has been filed for your fight.',
+            '',
+            'Our staff team will review your dispute and choose to:',
+            '• Pay one fighter the full pot',
+            '• Refund both fighters 50/50',
+            '',
+            'You will both be notified when this is resolved.',
+        ].join('\n'),
+        color: 'warning',
+        fields: [
+            { name: 'Fight ID', value: fight.id, inline: true },
+            { name: 'Escrowed Pot', value: formatCurrency(fight.amount * 2), inline: true },
+            { name: 'Challenger', value: `<@${fight.challenger_id}> (${fight.challengerOsrsUsername || 'Unknown'})`, inline: false },
+            { name: 'Opponent', value: `<@${fight.opponent_id}> (${fight.opponentOsrsUsername || 'Unknown'})`, inline: false },
+            { name: 'Challenger Claimed', value: formatFightConfirmation(fight.challengerConfirmed), inline: true },
+            { name: 'Opponent Claimed', value: formatFightConfirmation(fight.opponentConfirmed), inline: true },
+        ],
+    });
+}
+
 export function createFightReportedEmbed(fight, winnerId) {
     return createEmbed({
         title: 'Fight Result Reported',
@@ -143,6 +202,42 @@ export function createFightDisputeEmbed(fight, ticketChannelId) {
             { name: 'Escrowed Pot', value: formatCurrency(fight.amount * 2, { short: true }), inline: true },
             { name: 'Challenger', value: `<@${fight.challenger_id}> (${fight.challengerOsrsUsername || 'Unknown'})`, inline: false },
             { name: 'Opponent', value: `<@${fight.opponent_id}> (${fight.opponentOsrsUsername || 'Unknown'})`, inline: false },
+        ],
+    });
+}
+
+export function createFightDisputeResolvedEmbed(fight, resolvedBy, resolution) {
+    const resolutionTitle = resolution === 'refund'
+        ? 'Refund Both'
+        : resolution === 'challenger'
+            ? 'Pay Challenger'
+            : 'Pay Opponent';
+
+    const outcomeLines = resolution === 'refund'
+        ? [
+            `• <@${fight.challenger_id}> received: ${formatCurrency(fight.amount)}`,
+            `• <@${fight.opponent_id}> received: ${formatCurrency(fight.amount)}`,
+        ]
+        : [
+            `• <@${fight.challenger_id}> received: ${resolution === 'challenger' ? formatCurrency(fight.amount * 2) : formatCurrency(0)}`,
+            `• <@${fight.opponent_id}> received: ${resolution === 'opponent' ? formatCurrency(fight.amount * 2) : formatCurrency(0)}`,
+        ];
+
+    return createEmbed({
+        title: '✅ Dispute Resolved',
+        description: [
+            `**Resolution:** ${resolutionTitle}`,
+            `**Resolved by:** <@${resolvedBy}>`,
+            '',
+            '**Outcome:**',
+            ...outcomeLines,
+            '',
+            'Both fighters have been notified.',
+        ].join('\n'),
+        color: 'success',
+        fields: [
+            { name: 'Fight ID', value: fight.id, inline: true },
+            { name: 'Escrowed Pot', value: formatCurrency(fight.amount * 2), inline: true },
         ],
     });
 }

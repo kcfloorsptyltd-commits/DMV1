@@ -11,6 +11,7 @@ import {
     handleFightChallenge,
     handleFightReport,
     handleFightResult,
+    resolveDisputeFight,
     resolveFightFromWebhook,
 } from '../src/services/osrsStakingService.js';
 
@@ -320,4 +321,68 @@ test('expirePendingFights skips ticket_required fights', async () => {
     ]);
     assert.equal(balanceA.wallet, 9_000_000, 'Funds still escrowed for dispute fight');
     assert.equal(balanceB.wallet, 9_000_000, 'Funds still escrowed for dispute fight');
+});
+
+test('staff can resolve dispute by paying challenger the full pot', async () => {
+    const client = createClient();
+    const guildId = '100000000000000011';
+    const challengerId = '200000000000000111';
+    const opponentId = '200000000000000112';
+
+    await Promise.all([
+        seedWallet(client, guildId, challengerId, 10_000_000),
+        seedWallet(client, guildId, opponentId, 10_000_000),
+        linkOsrsUsername(client, guildId, challengerId, 'Ticket C'),
+        linkOsrsUsername(client, guildId, opponentId, 'Ticket D'),
+    ]);
+
+    const fight = await handleFightChallenge(client, guildId, challengerId, opponentId, 1_000_000);
+    await handleFightAccept(client, guildId, fight.id, opponentId);
+    await handleFightResult(client, guildId, challengerId, 'accept', fight.id);
+    await handleFightResult(client, guildId, opponentId, 'accept', fight.id);
+
+    const resolvedFight = await resolveDisputeFight(client, fight.id, 'challenger', 'admin-user');
+    const [challengerBalance, opponentBalance] = await Promise.all([
+        getEconomyData(client, guildId, challengerId),
+        getEconomyData(client, guildId, opponentId),
+    ]);
+
+    assert.equal(resolvedFight.status, 'completed');
+    assert.equal(resolvedFight.winner_id, challengerId);
+    assert.equal(resolvedFight.resolutionChoice, 'challenger');
+    assert.equal(resolvedFight.resolvedBy, 'admin-user');
+    assert.equal(challengerBalance.wallet, 11_000_000);
+    assert.equal(opponentBalance.wallet, 9_000_000);
+});
+
+test('staff can resolve dispute by refunding both fighters', async () => {
+    const client = createClient();
+    const guildId = '100000000000000012';
+    const challengerId = '200000000000000121';
+    const opponentId = '200000000000000122';
+
+    await Promise.all([
+        seedWallet(client, guildId, challengerId, 10_000_000),
+        seedWallet(client, guildId, opponentId, 10_000_000),
+        linkOsrsUsername(client, guildId, challengerId, 'Ticket E'),
+        linkOsrsUsername(client, guildId, opponentId, 'Ticket F'),
+    ]);
+
+    const fight = await handleFightChallenge(client, guildId, challengerId, opponentId, 1_000_000);
+    await handleFightAccept(client, guildId, fight.id, opponentId);
+    await handleFightResult(client, guildId, challengerId, 'accept', fight.id);
+    await handleFightResult(client, guildId, opponentId, 'accept', fight.id);
+
+    const resolvedFight = await resolveDisputeFight(client, fight.id, 'refund', 'admin-user');
+    const [challengerBalance, opponentBalance] = await Promise.all([
+        getEconomyData(client, guildId, challengerId),
+        getEconomyData(client, guildId, opponentId),
+    ]);
+
+    assert.equal(resolvedFight.status, 'cancelled');
+    assert.equal(resolvedFight.fundsRefunded, true);
+    assert.equal(resolvedFight.resolutionChoice, 'refund');
+    assert.equal(resolvedFight.resolutionSource, 'staff_refund');
+    assert.equal(challengerBalance.wallet, 10_000_000);
+    assert.equal(opponentBalance.wallet, 10_000_000);
 });

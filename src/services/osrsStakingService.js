@@ -241,6 +241,43 @@ export async function handleFightResult(client, guildId, userId, confirmation, f
     return { fight: disputed, outcome: 'dispute' };
 }
 
+export async function resolveDisputeFight(client, fightId, resolution, resolvedBy = null) {
+    if (!['challenger', 'opponent', 'refund'].includes(resolution)) {
+        throw new Error('Invalid dispute resolution.');
+    }
+
+    const fight = await getFight(client, fightId);
+    if (!fight) {
+        throw new Error('Fight not found.');
+    }
+
+    if (fight.status !== FIGHT_STATUSES.TICKET_REQUIRED) {
+        throw new Error('This dispute has already been resolved.');
+    }
+
+    let resolvedFight = null;
+
+    if (resolution === 'challenger') {
+        resolvedFight = await payoutFightWinner(client, fight.id, fight.challenger_id, {
+            source: 'staff_resolution',
+        });
+    } else if (resolution === 'opponent') {
+        resolvedFight = await payoutFightWinner(client, fight.id, fight.opponent_id, {
+            source: 'staff_resolution',
+        });
+    } else {
+        resolvedFight = await refundFight(client, fight.id);
+        resolvedFight.resolutionSource = 'staff_refund';
+    }
+
+    resolvedFight.resolutionChoice = resolution;
+    resolvedFight.resolvedBy = resolvedBy;
+    resolvedFight.resolved_at = new Date().toISOString();
+
+    await saveFight(client, resolvedFight);
+    return resolvedFight;
+}
+
 export async function resolveFightFromWebhook(client, guildId, killerName, victimName) {
     const [killerLink, victimLink] = await Promise.all([
         getOsrsLinkByUsername(client, guildId, killerName),

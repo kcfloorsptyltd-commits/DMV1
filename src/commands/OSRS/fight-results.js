@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder } from 'discord.js';
 import { errorEmbed } from '../../utils/embeds.js';
 import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -12,6 +12,8 @@ import {
     createFightCompletedEmbed,
     createFightCancelledEmbed,
     createFightDisputeEmbed,
+    createFightDisputeResolutionRow,
+    createFightDisputeTicketEmbed,
 } from '../../utils/osrsStakingPresentation.js';
 import { logger } from '../../utils/logger.js';
 
@@ -31,24 +33,33 @@ async function createDisputeTicket(client, guild, member, fight) {
 
         const result = await createTicket(guild, member, categoryId, reason);
         if (result.success && result.channel) {
-            const disputeDetails = new EmbedBuilder()
-                .setTitle(`⚠️ Fight Dispute — ${fight.challengerOsrsUsername || 'Challenger'} vs ${fight.opponentOsrsUsername || 'Opponent'}`)
-                .setColor(0xff0000)
-                .setDescription('Both fighters submitted conflicting results. Staff review is required.')
-                .addFields(
-                    { name: 'Fight ID', value: fight.id, inline: true },
-                    { name: 'Escrowed Pot', value: `${(fight.amount * 2).toLocaleString()} gp`, inline: true },
-                    { name: 'Challenger', value: `<@${fight.challenger_id}> (${fight.challengerOsrsUsername || 'Unknown'})`, inline: false },
-                    { name: 'Opponent', value: `<@${fight.opponent_id}> (${fight.opponentOsrsUsername || 'Unknown'})`, inline: false },
-                    { name: 'Challenger Confirmed', value: fight.challengerConfirmed || 'pending', inline: true },
-                    { name: 'Opponent Confirmed', value: fight.opponentConfirmed || 'pending', inline: true },
-                    { name: 'Disputed At', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
-                )
-                .setTimestamp();
+            const fighterIds = [...new Set([fight.challenger_id, fight.opponent_id].filter(Boolean))];
+            const permissionResults = await Promise.allSettled(
+                fighterIds.map((userId) =>
+                    result.channel.permissionOverwrites.create(userId, {
+                        ViewChannel: true,
+                        SendMessages: true,
+                        AttachFiles: true,
+                        ReadMessageHistory: true,
+                    }),
+                ),
+            );
+
+            permissionResults.forEach((permissionResult, index) => {
+                if (permissionResult.status === 'rejected') {
+                    logger.warn('[FIGHT_RESULTS] Failed to add fighter to dispute ticket', {
+                        fightId: fight.id,
+                        userId: fighterIds[index],
+                        error: permissionResult.reason?.message || 'Unknown error',
+                    });
+                }
+            });
 
             await result.channel.send({
                 content: `<@${fight.challenger_id}> <@${fight.opponent_id}>`,
-                embeds: [disputeDetails],
+                embeds: [createFightDisputeTicketEmbed(fight)],
+                components: [createFightDisputeResolutionRow(fight.id)],
+                allowedMentions: { users: fighterIds, roles: [] },
             });
 
             return result.channel;
