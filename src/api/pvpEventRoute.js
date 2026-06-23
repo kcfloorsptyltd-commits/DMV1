@@ -82,6 +82,9 @@ export function createPvpEventHandler({
   return async function handlePvpEventWebhook(req, res) {
     const ip = req.ip ?? 'unknown';
 
+    // Log incoming payload for debugging
+    logger.debug(`[PVP] Webhook received payload:`, JSON.stringify(req.body));
+
     // Skip token validation if no token is configured (for Dink plugin compatibility)
     if (token) {
       const providedToken = extractPvpEventAuthToken(req);
@@ -96,17 +99,36 @@ export function createPvpEventHandler({
       }
     }
 
-    const killer = normalizePvpEventName(req.body?.killer);
-    const victim = normalizePvpEventName(req.body?.victim);
-    const guildId = normalizePvpEventGuildId(req.body?.guildId) ?? normalizePvpEventGuildId(defaultGuildId);
+    // Support multiple payload formats (Dink might use different field names)
+    const killer = normalizePvpEventName(
+      req.body?.killer || 
+      req.body?.attacker || 
+      req.body?.opponent ||
+      req.body?.playerOne
+    );
+    const victim = normalizePvpEventName(
+      req.body?.victim || 
+      req.body?.defender || 
+      req.body?.player ||
+      req.body?.playerTwo
+    );
+    const guildId = normalizePvpEventGuildId(
+      req.body?.guildId || 
+      req.body?.serverId ||
+      req.body?.clanId ||
+      defaultGuildId
+    );
 
     if (!killer || !victim || !guildId) {
       logger.warn('[PVP] Rejected PvP webhook request due to invalid payload', {
         event: 'api.pvp_event.invalid_payload',
+        killer: killer ?? null,
+        victim: victim ?? null,
         guildId: guildId ?? null,
+        bodyKeys: Object.keys(req.body || {}),
         ip,
       });
-      return res.status(400).json({ error: 'Invalid payload' });
+      return res.status(400).json({ error: 'Invalid payload: missing killer, victim, or guildId' });
     }
 
     try {
