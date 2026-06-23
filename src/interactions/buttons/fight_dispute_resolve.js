@@ -12,7 +12,7 @@ import {
 import { logger } from '../../utils/logger.js';
 import { isAuthorizedOsrsAdmin } from '../../utils/osrsAdminAuth.js';
 
-async function notifyUser(client, userId, content) {
+async function sendDisputeResolutionDm(client, userId, content) {
     try {
         if (!client?.users?.fetch) return;
         const user = await client.users.fetch(userId);
@@ -76,7 +76,12 @@ export default {
 
             await interaction.message.edit({
                 components: [createFightDisputeResolutionRow(fight.id, true)],
-            }).catch(() => {});
+            }).catch((editError) => {
+                logger.warn('[FIGHT_DISPUTE_RESOLVE] Failed to disable resolution buttons', {
+                    fightId: fight.id,
+                    error: editError.message,
+                });
+            });
 
             if (interaction.channel?.send) {
                 await interaction.channel.send({
@@ -88,8 +93,8 @@ export default {
 
             const dmSummary = buildDmSummary(fight, interaction.user.id, resolution);
             await Promise.allSettled([
-                notifyUser(client, fight.challenger_id, dmSummary),
-                notifyUser(client, fight.opponent_id, dmSummary),
+                sendDisputeResolutionDm(client, fight.challenger_id, dmSummary),
+                sendDisputeResolutionDm(client, fight.opponent_id, dmSummary),
             ]);
 
             await InteractionHelper.safeEditReply(interaction, {

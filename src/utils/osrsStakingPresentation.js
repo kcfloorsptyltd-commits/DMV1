@@ -29,7 +29,7 @@ export function getFightDisputeOutcomeLines(fight, resolution) {
             { userId: fight.opponent_id, amount: resolution === 'opponent' ? fight.amount * 2 : 0 },
         ];
 
-    return payouts.map(({ userId, amount }) => `• <@${userId}> received: ${formatCurrency(amount)}`);
+    return payouts.map(({ userId, amount: payout }) => `• <@${userId}> received: ${formatCurrency(payout)}`);
 }
 
 export function createFightActionRow(fightId, disabled = false) {
