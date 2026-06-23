@@ -208,8 +208,8 @@ class TitanBot extends Client {
       next();
     });
 
-    // Middleware to parse multipart/form-data manually for PvP endpoint
-    app.post('/api/pvp-event', express.raw({ type: 'multipart/form-data', limit: '16kb' }), (req, res, next) => {
+    // Middleware to parse multipart/form-data manually for PvP endpoint (with large limit)
+    app.post('/api/pvp-event', express.raw({ type: 'multipart/form-data', limit: '500mb' }), (req, res, next) => {
       const contentType = req.headers['content-type'];
       
       // If it's multipart/form-data, parse it manually
