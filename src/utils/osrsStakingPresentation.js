@@ -206,9 +206,12 @@ export function createFightCancelledEmbed(fight, reason) {
 }
 
 export function createFightConfirmedEmbed(fight, confirmerId, confirmation) {
-    const label = confirmation === 'accept'
-        ? (!fight.reported_winner || fight.reported_winner === confirmerId ? '✅ Win Reported' : '✅ Result Accepted')
-        : '🚨 Result Disputed';
+    let label = '🚨 Result Disputed';
+    if (confirmation === 'accept') {
+        label = !fight.reported_winner || fight.reported_winner === confirmerId
+            ? '✅ Win Reported'
+            : '✅ Result Accepted';
+    }
     return createEmbed({
         title: 'Fight Result Recorded',
         description: `<@${confirmerId}> has submitted: **${label}**.\nThe other fighter can use the buttons below, \`/fight-results\`, or the Dink webhook to finish the outcome.`,
