@@ -34,6 +34,8 @@ export {
     getApplicationKey,
     getJoinToCreateConfigKey,
     getJoinToCreateChannelsKey,
+    getPvpStatsKey,
+    getPvpRecentKey,
 } from './database/keys.js';
 
 export {
@@ -45,6 +47,14 @@ export {
     incrementTicketCounter,
     getGuildTicketStats,
 } from './database/tickets.js';
+
+export {
+    getPvpStats,
+    savePvpStats,
+    recordPvpKill,
+    getRecentPvpEvents,
+    getAllPvpStats,
+} from './database/pvp.js';
 
 import { db, getFromDb, setInDb } from './database/wrapper.js';
 import {
