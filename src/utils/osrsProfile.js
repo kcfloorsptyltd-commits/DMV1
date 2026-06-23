@@ -134,13 +134,33 @@ export function buildFightStats(linkedUsernames, statsByUsername = {}, recentEve
         wins,
         losses,
         winRate,
-        currentStreak: streakType ? `${streakType === 'win' ? 'Win' : 'Loss'} ${streakCount}` : 'None',
+        currentStreak: formatStreakLabel(streakType, streakCount),
     };
 }
 
+function formatStreakLabel(streakType, streakCount) {
+    if (!streakType) {
+        return 'None';
+    }
+
+    return `${streakType === 'win' ? 'Win' : 'Loss'} ${streakCount}`;
+}
+
+function resolveStakeAmount(event) {
+    const candidateKeys = ['amount', 'stake', 'wager', 'value'];
+
+    for (const key of candidateKeys) {
+        const amount = Number(event?.[key]);
+        if (Number.isFinite(amount) && amount > 0) {
+            return amount;
+        }
+    }
+
+    return null;
+}
+
 function formatStakeSuffix(event, didWin) {
-    const rawAmount = event?.amount ?? event?.stake ?? event?.wager ?? event?.value;
-    const amount = Number(rawAmount);
+    const amount = resolveStakeAmount(event);
     if (!Number.isFinite(amount) || amount <= 0) {
         return '';
     }

@@ -90,6 +90,7 @@ export default {
         const recentActivityRows = buildRecentActivityRows(recentEvents, linkedUsernames, rsnToUserId, 5);
 
         const createdAt = Math.floor(targetUser.createdAt.getTime() / 1000);
+        const discordUsername = targetUser.username || targetUser.globalName || 'Unknown User';
         const embed = createEmbed({
             title: `${targetUser.username}'s OSRS Profile`,
             description: linkedUsernames.length === 0
@@ -100,7 +101,7 @@ export default {
                 {
                     name: '👤 User Info',
                     value: [
-                        `**Username:** ${targetUser.tag}`,
+                        `**Username:** ${discordUsername}`,
                         `**Mention:** ${targetUser}`,
                         `**Created:** <t:${createdAt}:F>`,
                     ].join('\n'),
