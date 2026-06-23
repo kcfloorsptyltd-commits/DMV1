@@ -212,8 +212,14 @@ export async function handleFightResult(client, guildId, userId, confirmation, f
     }
 
     if (confirmation === 'accept' && !fight.reported_winner) {
-        fight.reported_winner = userId;
-        fight.reportedAt = new Date().toISOString();
+        const latestFight = await getFight(client, fight.id);
+        if (latestFight?.reported_winner) {
+            fight.reported_winner = latestFight.reported_winner;
+            fight.reportedAt = latestFight.reportedAt || fight.reportedAt;
+        } else {
+            fight.reported_winner = userId;
+            fight.reportedAt = new Date().toISOString();
+        }
     }
 
     fight[confirmField] = confirmation;
@@ -239,7 +245,7 @@ export async function handleFightResult(client, guildId, userId, confirmation, f
         return { fight: resolved, outcome: 'resolved', winnerId };
     }
 
-    throw new Error('Invalid fight result state.');
+    throw new Error(`Invalid fight result state: challenger=${challengerConfirmed}, opponent=${opponentConfirmed}`);
 }
 
 export async function resolveFightDispute(client, guildId, fightId, resolution, resolverId) {

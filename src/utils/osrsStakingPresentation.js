@@ -207,7 +207,7 @@ export function createFightCancelledEmbed(fight, reason) {
 
 export function createFightConfirmedEmbed(fight, confirmerId, confirmation) {
     const label = confirmation === 'accept'
-        ? (fight.reported_winner === confirmerId ? '✅ Win Reported' : '✅ Result Accepted')
+        ? (!fight.reported_winner || fight.reported_winner === confirmerId ? '✅ Win Reported' : '✅ Result Accepted')
         : '🚨 Result Disputed';
     return createEmbed({
         title: 'Fight Result Recorded',
