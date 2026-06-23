@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { createEmbed, errorEmbed, successEmbed, infoEmbed, warningEmbed } from '../../utils/embeds.js';
 import { getEconomyData, getMaxBankCapacity, formatCurrency } from '../../utils/economy.js';
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -12,18 +12,39 @@ export default {
     data: new SlashCommandBuilder()
         .setName('balance')
         .setDescription("Check your balance")
-        // Note: Removed user option - users can only check their own balance
-        ,
+        .addUserOption(option =>
+            option
+                .setName('user')
+                .setDescription('User to check balance for (Admin only)')
+                .setRequired(false)
+        ),
 
     execute: withErrorHandling(async (interaction, config, client) => {
         const deferred = await InteractionHelper.safeDefer(interaction);
         if (!deferred) return;
 
-        // Always check the balance of the user who ran the command (no option to check others)
-        const targetUser = interaction.user;
+        const userOption = interaction.options.getUser("user");
         const guildId = interaction.guildId;
 
-        logger.info(`[ECONOMY] Balance check - userId: ${targetUser.id}, guildId: ${guildId}`);
+        // Check if user is trying to check someone else's balance
+        if (userOption) {
+            // Check if the command executor has Administrator permission or is the server owner
+            const isAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator) || 
+                           interaction.guild.ownerId === interaction.user.id;
+            
+            if (!isAdmin) {
+                throw createError(
+                    "Insufficient permissions",
+                    ErrorTypes.PERMISSION,
+                    "You don't have permission to check other users' balances. Only admins and the server owner can do this."
+                );
+            }
+        }
+
+        const targetUser = userOption || interaction.user;
+
+        logger.info(`[ECONOMY] Balance check - userOption: ${userOption?.id || 'null'}, targetUser: ${targetUser.id}, guildId: ${guildId}, isPrefix: ${!!interaction._commandStartTime}`);
+
         logger.debug(`[ECONOMY] Balance check for ${targetUser.id}`, { userId: targetUser.id, guildId });
 
         if (targetUser.bot) {
@@ -55,9 +76,18 @@ export default {
         // Only show Total (wallet + bank) as requested
         const total = wallet + bank;
 
+        // Determine title based on who is checking
+        const isCheckingOther = userOption && targetUser.id !== interaction.user.id;
+        const title = isCheckingOther 
+            ? `${MONEY_EMOJI} ${targetUser.username}'s Balance` 
+            : `${MONEY_EMOJI} Your Balance`;
+        const description = isCheckingOther
+            ? `Here is the current financial status for ${targetUser.username}.`
+            : `Here is your current financial status.`;
+
         const embed = createEmbed({
-            title: `${MONEY_EMOJI} Your Balance`,
-            description: `Here is your current financial status.`,
+            title: title,
+            description: description,
         })
             .addFields(
                 {
@@ -67,11 +97,11 @@ export default {
                 }
             )
             .setFooter({
-                text: `Your balance`,
+                text: isCheckingOther ? `Checked by ${interaction.user.tag}` : `Your balance`,
                 iconURL: interaction.user.displayAvatarURL(),
             });
 
-        logger.info(`[ECONOMY] Balance retrieved`, { userId: targetUser.id, wallet, bank, total });
+        logger.info(`[ECONOMY] Balance retrieved`, { userId: targetUser.id, wallet, bank, total, checkedBy: interaction.user.id });
 
         // Clear any thumbnail/image and log the embed JSON for debugging
         try {

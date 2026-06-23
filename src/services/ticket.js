@@ -128,7 +128,11 @@ export async function createTicket(guild, member, categoryId, reason = 'No reaso
           ],
         });
         logger.info('Default Tickets category created', { guildId: guild.id, categoryId: category.id });
+      } else {
+        logger.info('Found existing Tickets category', { guildId: guild.id, categoryId: category.id });
       }
+    } else {
+      logger.info('Using configured category', { guildId: guild.id, categoryId: category.id, categoryName: category.name });
     }
     
     if (!category) {
@@ -188,7 +192,8 @@ export async function createTicket(guild, member, categoryId, reason = 'No reaso
       guildId: guild.id,
       channelId: channel.id,
       channelName: channel.name,
-      parentId: channel.parentId
+      parentId: channel.parentId,
+      parentName: channel.parent?.name
     });
     
     const ticketData = {
@@ -248,7 +253,9 @@ export async function createTicket(guild, member, categoryId, reason = 'No reaso
       components: [row] 
     });
 
-    await ticketMessage.pin().catch(() => {});
+    await ticketMessage.pin().catch((pinErr) => {
+      logger.warn(`Could not pin ticket message: ${pinErr.message}`);
+    });
     
     await logTicketEvent({
       client: guild.client,
@@ -278,21 +285,21 @@ export async function createTicket(guild, member, categoryId, reason = 'No reaso
     return { success: true, channel, ticketData };
     
   } catch (error) {
+    logger.error('Error creating ticket - detailed info:', {
+      guildId: guild?.id,
+      userId: member?.id,
+      channelId: channel?.id,
+      error: error.message,
+      errorCode: error.code,
+      stack: error.stack
+    });
+    
     const typedError = ensureTypedServiceError(error, {
       service: 'ticketService',
       operation: 'createTicket',
       message: 'Ticket operation failed: createTicket',
       userMessage: 'Failed to create ticket. Please try again in a moment.',
       context: { guildId: guild?.id, userId: member?.id }
-    });
-    
-    logger.error('Error creating ticket:', {
-      guildId: guild?.id,
-      userId: member?.id,
-      channelId: channel?.id,
-      error: typedError.message,
-      errorCode: typedError.context?.errorCode,
-      stack: error.stack
     });
     
     return { 
