@@ -50,8 +50,38 @@ export function getMaxBankCapacity(userData) {
     return capacity;
 }
 
-export function formatCurrency(amount) {
-    return `${amount.toLocaleString()} ${ECONOMY_CONFIG.currency || 'coins'}`;
+export function formatCurrency(amount, options = {}) {
+    const num = Number(amount) || 0;
+    // Prefer structured currency config if available
+    const cfg = ECONOMY_CONFIG.currency;
+
+    // Determine symbol to use (fallback to gp)
+    let symbol = 'gp';
+    if (cfg) {
+        if (typeof cfg === 'string') {
+            symbol = cfg;
+        } else if (typeof cfg === 'object' && cfg.symbol) {
+            symbol = cfg.symbol;
+        } else if (typeof cfg === 'object' && cfg.name) {
+            symbol = cfg.name;
+        }
+    }
+
+    const short = options && options.short === true;
+
+    if (short) {
+        // Compact formatting: 1.2m, 3.4k
+        if (num >= 1000000) {
+            return `${(num / 1000000).toFixed(1).replace(/\.0$/, '')}m ${symbol}`;
+        }
+        if (num >= 1000) {
+            return `${(num / 1000).toFixed(1).replace(/\.0$/, '')}k ${symbol}`;
+        }
+        return `${num.toLocaleString()} ${symbol}`;
+    }
+
+    // Full formatting
+    return `${num.toLocaleString()} ${symbol}`;
 }
 
 export async function getEconomyData(client, guildId, userId) {
@@ -160,7 +190,7 @@ export function getWorkReward() {
     return {
         amount,
         job,
-        message: `You ${job} and earned ${formatCurrency(amount)}!`
+        message: `You ${job} and earned ${formatCurrency(amount, { short: true })}!`
     };
 }
 
@@ -214,7 +244,7 @@ const success = Math.random() > 0.4;
     
     if (success) {
         const amount = Math.min(
-Math.floor(Math.random() * (targetBalance * 0.3)) + 1,
+ Math.floor(Math.random() * (targetBalance * 0.3)) + 1,
             targetBalance
         );
         

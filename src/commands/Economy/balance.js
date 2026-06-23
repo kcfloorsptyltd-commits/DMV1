@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { createEmbed, errorEmbed, successEmbed, infoEmbed, warningEmbed } from '../../utils/embeds.js';
-import { getEconomyData, getMaxBankCapacity } from '../../utils/economy.js';
+import { getEconomyData, getMaxBankCapacity, formatCurrency } from '../../utils/economy.js';
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
 import { logger } from '../../utils/logger.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -61,17 +61,17 @@ export default {
                 .addFields(
                     {
                         name: "💵 Cash",
-                        value: `$${wallet.toLocaleString()}`,
+                        value: `${formatCurrency(wallet, { short: true })}`,
                         inline: true,
                     },
                     {
                         name: "🏦 Bank",
-                        value: `$${bank.toLocaleString()} / $${maxBank.toLocaleString()}`,
+                        value: `${formatCurrency(bank, { short: true })} / ${formatCurrency(maxBank, { short: true })}`,
                         inline: true,
                     },
                     {
                         name: "💰 Total",
-                        value: `$${(wallet + bank).toLocaleString()}`,
+                        value: `${formatCurrency(wallet + bank, { short: true })}`,
                         inline: true,
                     }
                 )

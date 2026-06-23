@@ -1,23 +1,23 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { createEmbed, errorEmbed, successEmbed } from '../../utils/embeds.js';
-import { getEconomyData, addMoney, formatCurrency } from '../../utils/economy.js';
+import { createEmbed, errorEmbed } from '../../utils/embeds.js';
+import { getEconomyData, removeMoney, formatCurrency } from '../../utils/economy.js';
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 export default {
   data: new SlashCommandBuilder()
-    .setName('add')
-    .setDescription('Administrative add actions (admin only)')
+    .setName('remove')
+    .setDescription('Administrative remove actions (admin only)')
     .addSubcommand(sub =>
       sub
         .setName('balance')
-        .setDescription("Add money to a user's balance")
+        .setDescription("Remove money from a user's balance")
         .addUserOption(opt => opt.setName('user').setDescription('User to update').setRequired(true))
-        .addNumberOption(opt => opt.setName('amount').setDescription('Amount to add').setRequired(true))
+        .addNumberOption(opt => opt.setName('amount').setDescription('Amount to remove').setRequired(true))
         .addStringOption(opt =>
           opt
             .setName('type')
-            .setDescription('Where to add the money')
+            .setDescription('Where to remove the money from')
             .addChoices(
               { name: 'wallet', value: 'wallet' },
               { name: 'bank', value: 'bank' }
@@ -26,7 +26,7 @@ export default {
     ),
 
   execute: withErrorHandling(async (interaction, config, client) => {
-    // permission check: require Manage Guild or Administrator
+    // permission check: require Administrator or Manage Guild
     const perms = interaction.memberPermissions;
     const allowed = perms?.has?.(PermissionFlagsBits.Administrator) || perms?.has?.(PermissionFlagsBits.ManageGuild);
     if (!allowed) {
@@ -56,11 +56,16 @@ export default {
 
       const before = await getEconomyData(client, guildId, target.id) || { wallet: 0, bank: 0 };
 
-      const result = await addMoney(client, guildId, target.id, amount, type);
+      const result = await removeMoney(client, guildId, target.id, amount, type);
 
       if (!result || result.success === false) {
-        const errMsg = result && result.error ? result.error : 'Failed to add money';
-        await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed(errMsg)] });
+        // include friendly details if available (insufficient, current, required, etc.)
+        const errMsg = result && result.error ? result.error : 'Failed to remove money';
+        let body = errMsg;
+        if (result && result.current !== undefined) {
+          body += ` (current: ${formatCurrency(result.current, { short: true })}${result.required ? `, required: ${formatCurrency(result.required, { short: true })}` : ''})`;
+        }
+        await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed(body)] });
         return;
       }
 
@@ -69,7 +74,7 @@ export default {
 
       const embed = createEmbed({
         title: 'Balance Updated',
-        description: `Added ${formatCurrency(Number(amount), { short: true })} to ${target.username}'s ${fieldName}`,
+        description: `Removed ${formatCurrency(Number(amount), { short: true })} from ${target.username}'s ${fieldName}`,
       })
         .addFields(
           { name: 'User', value: `${target.tag} (${target.id})`, inline: true },
@@ -80,5 +85,5 @@ export default {
 
       await InteractionHelper.safeEditReply(interaction, { embeds: [embed] });
     }
-  }, { command: 'add' })
+  }, { command: 'remove' })
 };
