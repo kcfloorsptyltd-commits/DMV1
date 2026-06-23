@@ -158,7 +158,7 @@ export async function createTicket(guild, member, categoryId, reason = 'No reaso
       categoryName: category.name
     });
     
-    const channel = await guild.channels.create({
+    channel = await guild.channels.create({
       name: channelName,
       type: ChannelType.GuildText,
       parent: category.id,
@@ -293,6 +293,22 @@ export async function createTicket(guild, member, categoryId, reason = 'No reaso
       errorCode: error.code,
       stack: error.stack
     });
+
+    // Clean up the channel if it was created before the error occurred
+    if (channel) {
+      try {
+        await channel.delete('Ticket creation failed — cleaning up orphaned channel');
+        logger.info('Orphaned ticket channel deleted after creation failure', {
+          guildId: guild?.id,
+          channelId: channel.id
+        });
+      } catch (deleteError) {
+        logger.warn('Could not delete orphaned ticket channel:', {
+          channelId: channel?.id,
+          error: deleteError.message
+        });
+      }
+    }
     
     const typedError = ensureTypedServiceError(error, {
       service: 'ticketService',
