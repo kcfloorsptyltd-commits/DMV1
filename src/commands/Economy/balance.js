@@ -5,6 +5,9 @@ import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHan
 import { logger } from '../../utils/logger.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
+// Use Unicode escape to ensure the emoji is preserved in all environments
+const MONEY_EMOJI = '\u{1F4B0}';
+
 export default {
     data: new SlashCommandBuilder()
         .setName('balance')
@@ -61,17 +64,17 @@ export default {
                 .addFields(
                     {
                         name: "💵 Cash",
-                        value: `💰 ${formatCurrency(wallet, { short: true, noSymbol: true })} gp`,
+                        value: `${MONEY_EMOJI} ${formatCurrency(wallet, { short: true, noSymbol: true })} gp`,
                         inline: true,
                     },
                     {
                         name: "🏦 Bank",
-                        value: `💰 ${formatCurrency(bank, { short: true, noSymbol: true })} gp / ${formatCurrency(maxBank, { short: true, noSymbol: true })} gp`,
+                        value: `${MONEY_EMOJI} ${formatCurrency(bank, { short: true, noSymbol: true })} gp / ${formatCurrency(maxBank, { short: true, noSymbol: true })} gp`,
                         inline: true,
                     },
                     {
                         name: "💰 Total",
-                        value: `💰 ${formatCurrency(wallet + bank, { short: true, noSymbol: true })} gp`,
+                        value: `${MONEY_EMOJI} ${formatCurrency(wallet + bank, { short: true, noSymbol: true })} gp`,
                         inline: true,
                     }
                 )

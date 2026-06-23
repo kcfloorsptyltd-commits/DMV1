@@ -4,7 +4,8 @@ import { getEconomyData, removeMoney, formatCurrency } from '../../utils/economy
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
-const MONEY_EMOJI = '💰';
+// Use Unicode escape to ensure the emoji is preserved in all environments
+const MONEY_EMOJI = '\u{1F4B0}';
 
 export default {
   data: new SlashCommandBuilder()
