@@ -4,7 +4,6 @@ import { handleFightResult } from '../../services/osrsStakingService.js';
 import { getFight, saveFight } from '../../utils/database/fights.js';
 import { createFightDisputeTicket } from '../../utils/osrsFightDispute.js';
 import {
-    createFightCancelledEmbed,
     createFightCompletedEmbed,
     createFightDisputeEmbed,
     createFightResultConfirmationRow,
@@ -28,7 +27,7 @@ export default {
         const [action, fightId] = args;
 
         try {
-            if (!fightId || !['accept', 'decline'].includes(action)) {
+            if (!fightId || !['accept', 'dispute'].includes(action)) {
                 throw new Error('Invalid fight result button.');
             }
 
@@ -52,14 +51,6 @@ export default {
             if (outcome === 'resolved') {
                 await interaction.update({
                     embeds: [createFightCompletedEmbed(fight)],
-                    components: [disabledRow],
-                });
-                return;
-            }
-
-            if (outcome === 'refunded') {
-                await interaction.update({
-                    embeds: [createFightCancelledEmbed(fight, 'Both fighters confirmed the fight is cancelled. Both stakes have been refunded.')],
                     components: [disabledRow],
                 });
                 return;

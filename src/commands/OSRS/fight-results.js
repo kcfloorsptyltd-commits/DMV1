@@ -9,7 +9,6 @@ import { createFightDisputeTicket } from '../../utils/osrsFightDispute.js';
 import {
     createFightConfirmedEmbed,
     createFightCompletedEmbed,
-    createFightCancelledEmbed,
     createFightDisputeEmbed,
     createFightResultConfirmationRow,
 } from '../../utils/osrsStakingPresentation.js';
@@ -21,11 +20,11 @@ export default {
         .addStringOption((option) =>
             option
                 .setName('result')
-                .setDescription('Did you win or lose?')
+                .setDescription('Accept the reported winner or dispute the result')
                 .setRequired(true)
                 .addChoices(
-                    { name: '✅ Accept — I won this fight', value: 'accept' },
-                    { name: '❌ Decline — I lost this fight', value: 'decline' },
+                    { name: '✅ Accept — I agree with the reported winner', value: 'accept' },
+                    { name: '🚨 Dispute — I disagree and need staff review', value: 'dispute' },
                 ),
         )
         .addStringOption((option) =>
@@ -43,7 +42,7 @@ export default {
         const fightId = interaction.options.getString('fight-id');
 
         try {
-            const { fight, outcome, winnerId } = await handleFightResult(
+            const { fight, outcome } = await handleFightResult(
                 client,
                 interaction.guildId,
                 interaction.user.id,
@@ -54,13 +53,6 @@ export default {
             if (outcome === 'resolved') {
                 await InteractionHelper.safeEditReply(interaction, {
                     embeds: [createFightCompletedEmbed(fight)],
-                });
-                return;
-            }
-
-            if (outcome === 'refunded') {
-                await InteractionHelper.safeEditReply(interaction, {
-                    embeds: [createFightCancelledEmbed(fight, 'Both fighters confirmed the fight is cancelled. Both stakes have been refunded.')],
                 });
                 return;
             }
