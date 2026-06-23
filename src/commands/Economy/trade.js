@@ -71,13 +71,23 @@ ${target}, you have 2 minutes to Accept or Decline.`,
       new ButtonBuilder().setCustomId(declineId).setLabel('Decline').setStyle(ButtonStyle.Danger)
     );
 
-    // Send offer (edit the deferred reply)
-    await InteractionHelper.safeEditReply(interaction, { embeds: [offerEmbed], components: [row] });
+    // Send offer as a fresh follow-up message so component tokens are tied to a new message
+    let offerMessage;
+    try {
+      offerMessage = await interaction.followUp({ embeds: [offerEmbed], components: [row], fetchReply: true });
+    } catch (err) {
+      logger.error('Failed to send followUp for trade offer, falling back to editReply', err);
+      await InteractionHelper.safeEditReply(interaction, { embeds: [offerEmbed], components: [row] }).catch(() => {});
+      offerMessage = await interaction.fetchReply().catch(() => null);
+    }
 
-    // Fetch the reply message so we can await component interactions
-    const offerMessage = await interaction.fetchReply();
+    if (!offerMessage) {
+      // If we couldn't obtain a message to attach a collector to, inform and exit
+      await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed('Failed to post trade offer message. Please try again later.')] }).catch(() => {});
+      return;
+    }
 
-    // Create a collector so we can provide better feedback to non-recipients
+    // Create a collector on the posted message so we can provide better feedback to non-recipients
     const collector = offerMessage.createMessageComponentCollector({ time: 2 * 60 * 1000 });
 
     collector.on('collect', async (i) => {
@@ -100,7 +110,7 @@ ${target}, you have 2 minutes to Accept or Decline.`,
           const declineEmbed = createEmbed({ title: 'Trade Declined', description: `${target.tag} declined the trade offer from ${sender.tag}.` });
           await i.update({ embeds: [declineEmbed], components: [disabledRow] }).catch(async (err) => {
             logger.warn('Failed to update decline response', err);
-            await InteractionHelper.safeEditReply(interaction, { embeds: [createEmbed({ title: 'Trade Declined', description: `${target.tag} declined the trade offer.` })], components: [disabledRow] }).catch(() => {});
+            await offerMessage.edit({ embeds: [createEmbed({ title: 'Trade Declined', description: `${target.tag} declined the trade offer.` })], components: [disabledRow] }).catch(() => {});
           });
           collector.stop('declined');
           return;
@@ -113,7 +123,7 @@ ${target}, you have 2 minutes to Accept or Decline.`,
         const latestSender = await getEconomyData(client, guildId, sender.id) || { wallet: 0, bank: 0 };
         if ((latestSender.wallet || 0) < parsedAmount) {
           const failEmbed = createEmbed({ title: 'Trade Failed', description: `Trade could not be completed because ${sender.tag} no longer has sufficient wallet funds.` });
-          await InteractionHelper.safeEditReply(interaction, { embeds: [failEmbed], components: [disabledRow] }).catch(() => {});
+          await offerMessage.edit({ embeds: [failEmbed], components: [disabledRow] }).catch(() => {});
           collector.stop('insufficient');
           return;
         }
@@ -123,7 +133,7 @@ ${target}, you have 2 minutes to Accept or Decline.`,
         if (!removal || removal.success === false) {
           const errMsg = removal && removal.error ? removal.error : 'Failed to remove money from sender.';
           const failEmbed = createEmbed({ title: 'Trade Failed', description: `Failed to withdraw funds from ${sender.tag}: ${errMsg}` });
-          await InteractionHelper.safeEditReply(interaction, { embeds: [failEmbed], components: [disabledRow] }).catch(() => {});
+          await offerMessage.edit({ embeds: [failEmbed], components: [disabledRow] }).catch(() => {});
           collector.stop('removal_failed');
           return;
         }
@@ -137,7 +147,7 @@ ${target}, you have 2 minutes to Accept or Decline.`,
           const refundMsg = refund && refund.success ? ' Sender has been refunded.' : ' Refund failed — contact an admin.';
           const errText = (addition && addition.error) ? addition.error + refundMsg : `Failed to add funds to recipient.${refundMsg}`;
           const failEmbed = createEmbed({ title: 'Trade Failed', description: errText });
-          await InteractionHelper.safeEditReply(interaction, { embeds: [failEmbed], components: [disabledRow] }).catch(() => {});
+          await offerMessage.edit({ embeds: [failEmbed], components: [disabledRow] }).catch(() => {});
           collector.stop('addition_failed');
           return;
         }
@@ -158,7 +168,7 @@ ${target}, you have 2 minutes to Accept or Decline.`,
           )
           .setFooter({ text: `Requested by ${sender.tag}`, iconURL: sender.displayAvatarURL() });
 
-        await InteractionHelper.safeEditReply(interaction, { embeds: [successEmbed], components: [disabledRow] }).catch((err) => {
+        await offerMessage.edit({ embeds: [successEmbed], components: [disabledRow] }).catch((err) => {
           logger.error('Failed to send trade success embed', err);
         });
 
@@ -172,7 +182,7 @@ ${target}, you have 2 minutes to Accept or Decline.`,
             new ButtonBuilder().setCustomId(declineId).setLabel('Decline').setStyle(ButtonStyle.Danger).setDisabled(true)
           );
           const failEmbed = createEmbed({ title: 'Trade Error', description: 'An unexpected error occurred while processing the trade. Buttons have been disabled.' });
-          await InteractionHelper.safeEditReply(interaction, { embeds: [failEmbed], components: [disabledRow] });
+          await offerMessage.edit({ embeds: [failEmbed], components: [disabledRow] });
         } catch (editErr) {
           logger.error('Failed to disable buttons after collector error', editErr);
         }
@@ -189,7 +199,7 @@ ${target}, you have 2 minutes to Accept or Decline.`,
             new ButtonBuilder().setCustomId(declineId).setLabel('Decline').setStyle(ButtonStyle.Danger).setDisabled(true)
           );
           const expiredEmbed = createEmbed({ title: 'Trade Expired', description: 'The trade offer has expired (no response).' });
-          await InteractionHelper.safeEditReply(interaction, { embeds: [expiredEmbed], components: [disabledRow] });
+          await offerMessage.edit({ embeds: [expiredEmbed], components: [disabledRow] });
         } catch (editErr) {
           logger.warn('Failed to mark trade offer expired on collector end', editErr);
         }
