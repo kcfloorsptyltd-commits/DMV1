@@ -13,7 +13,8 @@ function sanitizeEmbedText(text = '') {
   }
 
   return text
-    .replace(EMOJI_REGEX, '')
+    // Keep pictographic emoji characters but remove variation selectors only
+    .replace(/\uFE0F/g, '')
     .replace(/[ \t]+/g, ' ')  // Replace consecutive spaces/tabs with single space
     .replace(/[ \t]\n/g, '\n')  // Remove spaces before newlines
     .replace(/\n[ \t]/g, '\n')  // Remove spaces after newlines

@@ -22,14 +22,19 @@ import { getGuildConfig } from '../services/guildConfig.js';
 import { successEmbed } from '../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../utils/errorHandler.js';
 import { logger } from '../utils/logger.js';
-import {
-  buildLoggingDashboardView,
-  buildLoggingCategoriesView,
-  buildLoggingFilterView,
-  isCategoriesView,
-  isFilterView,
-  refreshDashboardMessage,
-} from '../commands/Logging/modules/logging_dashboard.js';
+
+// Lazy-load the logging dashboard module because it is optional in some deployments
+let loggingDashboardModule = null;
+async function loadLoggingDashboardModule() {
+  if (loggingDashboardModule !== null) return loggingDashboardModule;
+  try {
+    loggingDashboardModule = await import('../commands/Logging/modules/logging_dashboard.js');
+  } catch (err) {
+    logger.warn('logging_dashboard module not found — dashboard features disabled.');
+    loggingDashboardModule = null;
+  }
+  return loggingDashboardModule;
+}
 
 const LOGGING_CATEGORIES = [...new Set(Object.values(EVENT_TYPES).map((eventType) => eventType.split('.')[0]))];
 
@@ -87,33 +92,48 @@ export default {
 };
 
 async function handleRefresh(interaction) {
-  if (isCategoriesView(interaction)) {
-    const { embed, components } = await buildLoggingCategoriesView(interaction, interaction.client);
+  const mod = await loadLoggingDashboardModule();
+  if (!mod) {
+    return interaction.reply({ content: 'Logging dashboard is not available in this deployment.', ephemeral: true });
+  }
+
+  if (mod.isCategoriesView(interaction)) {
+    const { embed, components } = await mod.buildLoggingCategoriesView(interaction, interaction.client);
     return interaction.update({ embeds: [embed], components, content: null });
   }
 
-  if (isFilterView(interaction)) {
-    const { embed, components } = await buildLoggingFilterView(interaction, interaction.client);
+  if (mod.isFilterView(interaction)) {
+    const { embed, components } = await mod.buildLoggingFilterView(interaction, interaction.client);
     return interaction.update({ embeds: [embed], components, content: null });
   }
 
-  const { embed, components } = await buildLoggingDashboardView(interaction, interaction.client);
+  const { embed, components } = await mod.buildLoggingDashboardView(interaction, interaction.client);
   await interaction.update({ embeds: [embed], components, content: null });
 }
 
 async function handleBackToMain(interaction) {
-  const { embed, components } = await buildLoggingDashboardView(interaction, interaction.client);
+  const mod = await loadLoggingDashboardModule();
+  if (!mod) {
+    return interaction.reply({ content: 'Logging dashboard is not available in this deployment.', ephemeral: true });
+  }
+
+  const { embed, components } = await mod.buildLoggingDashboardView(interaction, interaction.client);
   await interaction.update({ embeds: [embed], components, content: null });
 }
 
 async function handleToggle(interaction) {
+  const mod = await loadLoggingDashboardModule();
+  if (!mod) {
+    return interaction.reply({ content: 'Logging dashboard is not available in this deployment.', ephemeral: true });
+  }
+
   const eventType = interaction.customId.replace('log_dash_toggle:', '');
   if (!eventType) {
     return interaction.reply({ content: '❌ Invalid event type.', ephemeral: true });
   }
 
   const status = await getLoggingStatus(interaction.client, interaction.guildId);
-  const onCategoriesView = isCategoriesView(interaction);
+  const onCategoriesView = mod.isCategoriesView(interaction);
 
   if (eventType === 'audit_enabled') {
     await setLoggingEnabled(interaction.client, interaction.guildId, !Boolean(status.enabled));
@@ -128,11 +148,11 @@ async function handleToggle(interaction) {
   }
 
   if (onCategoriesView || (eventType !== 'audit_enabled' && eventType.includes('.*'))) {
-    const { embed, components } = await buildLoggingCategoriesView(interaction, interaction.client);
+    const { embed, components } = await mod.buildLoggingCategoriesView(interaction, interaction.client);
     return interaction.update({ embeds: [embed], components, content: null });
   }
 
-  const { embed, components } = await buildLoggingDashboardView(interaction, interaction.client);
+  const { embed, components } = await mod.buildLoggingDashboardView(interaction, interaction.client);
   await interaction.update({ embeds: [embed], components, content: null });
 }
 
@@ -205,12 +225,18 @@ async function handleAddFilterModal(interaction) {
     await updateIgnoreList(interaction.client, interaction.guildId, { action: 'add', type: filterType, id });
 
     await modalSubmission.reply({
-      embeds: [successEmbed('Filter Added', `${filterType === 'user' ? 'User' : 'Channel'} \`${id}\` will be ignored in audit logs.`)],
+      embeds: [successEmbed('Filter Added', `${filterType === 'user' ? 'User' : 'Channel'} `${id}` will be ignored in audit logs.`)],
       flags: MessageFlags.Ephemeral,
     });
 
-    if (isFilterView(interaction)) {
-      await refreshDashboardMessage(interaction, interaction.client);
+    // attempt to refresh dashboard message if module available
+    try {
+      const mod = await loadLoggingDashboardModule();
+      if (mod && mod.isFilterView(interaction)) {
+        await mod.refreshDashboardMessage(interaction, interaction.client);
+      }
+    } catch (err) {
+      // ignore
     }
   } catch (error) {
     if (error.code === 'INTERACTION_TIMEOUT') {
@@ -289,12 +315,17 @@ async function handleRemoveFilterModal(interaction) {
     await updateIgnoreList(interaction.client, interaction.guildId, { action: 'remove', type, id });
 
     await modalSubmission.reply({
-      embeds: [successEmbed('Filter Removed', `Removed ${type} \`${id}\` from the ignore list.`)],
+      embeds: [successEmbed('Filter Removed', `Removed ${type} `${id}` from the ignore list.`)],
       flags: MessageFlags.Ephemeral,
     });
 
-    if (isFilterView(interaction)) {
-      await refreshDashboardMessage(interaction, interaction.client);
+    try {
+      const mod = await loadLoggingDashboardModule();
+      if (mod && mod.isFilterView(interaction)) {
+        await mod.refreshDashboardMessage(interaction, interaction.client);
+      }
+    } catch (err) {
+      // ignore
     }
   } catch (error) {
     if (error.code === 'INTERACTION_TIMEOUT') {
@@ -360,7 +391,12 @@ async function showChannelModal(interaction, destination) {
       flags: MessageFlags.Ephemeral,
     });
 
-    await refreshDashboardMessage(interaction, interaction.client);
+    try {
+      const mod = await loadLoggingDashboardModule();
+      if (mod) await mod.refreshDashboardMessage(interaction, interaction.client);
+    } catch (err) {
+      // ignore
+    }
   } catch (error) {
     if (error.code === 'INTERACTION_TIMEOUT') {
       return;
@@ -391,22 +427,35 @@ export async function handleLoggingMenuSelect(interaction) {
   if (value.startsWith('clear:')) {
     const destination = value.replace('clear:', '');
     await setLogChannel(interaction.client, interaction.guildId, destination, null);
-    const { embed, components } = await buildLoggingDashboardView(interaction, interaction.client);
-    return interaction.update({
-      embeds: [embed],
-      components,
-      content: null,
-    });
+    const mod = await loadLoggingDashboardModule();
+    if (mod) {
+      const { embed, components } = await mod.buildLoggingDashboardView(interaction, interaction.client);
+      return interaction.update({
+        embeds: [embed],
+        components,
+        content: null,
+      });
+    }
+
+    return interaction.update({ content: 'Logging dashboard not available', components: [], embeds: [] });
   }
 
   if (value === 'view:categories') {
-    const { embed, components } = await buildLoggingCategoriesView(interaction, interaction.client);
-    return interaction.update({ embeds: [embed], components, content: null });
+    const mod = await loadLoggingDashboardModule();
+    if (mod) {
+      const { embed, components } = await mod.buildLoggingCategoriesView(interaction, interaction.client);
+      return interaction.update({ embeds: [embed], components, content: null });
+    }
+    return interaction.update({ content: 'Logging dashboard not available', components: [], embeds: [] });
   }
 
   if (value === 'view:filters') {
-    const { embed, components } = await buildLoggingFilterView(interaction, interaction.client);
-    return interaction.update({ embeds: [embed], components, content: null });
+    const mod = await loadLoggingDashboardModule();
+    if (mod) {
+      const { embed, components } = await mod.buildLoggingFilterView(interaction, interaction.client);
+      return interaction.update({ embeds: [embed], components, content: null });
+    }
+    return interaction.update({ content: 'Logging dashboard not available', components: [], embeds: [] });
   }
 
   return interaction.reply({ content: '❌ Unknown option.', ephemeral: true });
