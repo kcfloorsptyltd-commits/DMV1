@@ -79,8 +79,8 @@ export function createFightResultConfirmationRow(fightId, disabled = false) {
             .setStyle(ButtonStyle.Success)
             .setDisabled(disabled),
         new ButtonBuilder()
-            .setCustomId(`fight_result:decline:${fightId}`)
-            .setLabel('❌ Decline')
+            .setCustomId(`fight_result:dispute:${fightId}`)
+            .setLabel('🚨 Dispute')
             .setStyle(ButtonStyle.Danger)
             .setDisabled(disabled),
     );
@@ -206,10 +206,15 @@ export function createFightCancelledEmbed(fight, reason) {
 }
 
 export function createFightConfirmedEmbed(fight, confirmerId, confirmation) {
-    const label = confirmation === 'accept' ? '✅ Win Claimed' : '❌ Loss Accepted';
+    let label = '🚨 Result Disputed';
+    if (confirmation === 'accept') {
+        label = !fight.reported_winner || fight.reported_winner === confirmerId
+            ? '✅ Win Reported'
+            : '✅ Result Accepted';
+    }
     return createEmbed({
         title: 'Fight Result Recorded',
-        description: `<@${confirmerId}> has confirmed: **${label}**.\nThe other fighter can use the buttons below, \`/fight-results\`, or the Dink webhook to finish the outcome.`,
+        description: `<@${confirmerId}> has submitted: **${label}**.\nThe other fighter can use the buttons below, \`/fight-results\`, or the Dink webhook to finish the outcome.`,
         color: 'info',
         fields: [
             { name: 'Fight ID', value: fight.id, inline: true },
@@ -248,8 +253,8 @@ export function createFightDisputeEmbed(fight, ticketChannelId) {
     return createEmbed({
         title: '⚠️ Fight Dispute — Ticket Created',
         description: [
-            'Conflicting results were submitted for this fight.',
-            'Both fighters\' confirmations do not match — a support ticket has been auto-created for manual review.',
+            'A fighter disputed the reported result for this fight.',
+            'A support ticket has been auto-created for manual review.',
             ticketChannelId ? `📋 **Ticket:** <#${ticketChannelId}>` : null,
             'Funds remain in escrow until staff resolve the ticket.',
         ].filter(Boolean).join('\n\n'),

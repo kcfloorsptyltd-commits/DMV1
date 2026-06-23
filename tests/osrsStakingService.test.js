@@ -131,8 +131,8 @@ test('fight challenge escrows both wallets and webhook awards the winner', async
     assert.ok(webhookResult, 'Webhook should return a result');
     assert.equal(webhookResult.outcome, 'waiting', 'Should wait for opponent confirmation after webhook');
 
-    // Opponent confirms their loss via /fight-results — should resolve the fight
-    const confirmResult = await handleFightResult(client, guildId, opponentId, 'decline', fight.id);
+    // Opponent accepts the reported winner via /fight-results — should resolve the fight
+    const confirmResult = await handleFightResult(client, guildId, opponentId, 'accept', fight.id);
     assert.equal(confirmResult.outcome, 'resolved', 'Fight should resolve when victim confirms via /fight-results');
     assert.equal(confirmResult.winnerId, challengerId);
 
@@ -144,7 +144,7 @@ test('fight challenge escrows both wallets and webhook awards the winner', async
     assert.equal(loserBalance.wallet, 15_000_000);
 });
 
-test('fight resolves when challenger accepts and opponent declines', async () => {
+test('fight resolves when both fighters accept the reported winner', async () => {
     const client = createClient();
     const guildId = '100000000000000005';
     const challengerId = '200000000000000051';
@@ -163,9 +163,9 @@ test('fight resolves when challenger accepts and opponent declines', async () =>
     const result1 = await handleFightResult(client, guildId, challengerId, 'accept', fight.id);
     assert.equal(result1.outcome, 'waiting', 'Should wait after first confirmation');
 
-    const result2 = await handleFightResult(client, guildId, opponentId, 'decline', fight.id);
-    assert.equal(result2.outcome, 'resolved', 'Should resolve when both confirm consistently');
-    assert.equal(result2.winnerId, challengerId, 'Challenger should win when they accepted and opponent declined');
+    const result2 = await handleFightResult(client, guildId, opponentId, 'accept', fight.id);
+    assert.equal(result2.outcome, 'resolved', 'Should resolve when both accept the reported winner');
+    assert.equal(result2.winnerId, challengerId, 'Challenger should win when both accept challenger-reported result');
 
     const [winnerBalance, loserBalance] = await Promise.all([
         getEconomyData(client, guildId, challengerId),
@@ -175,7 +175,7 @@ test('fight resolves when challenger accepts and opponent declines', async () =>
     assert.equal(loserBalance.wallet, 8_000_000);
 });
 
-test('fight creates dispute when both fighters claim to have won', async () => {
+test('fight creates dispute when opponent disputes the reported winner', async () => {
     const client = createClient();
     const guildId = '100000000000000006';
     const challengerId = '200000000000000061';
@@ -192,8 +192,8 @@ test('fight creates dispute when both fighters claim to have won', async () => {
     await handleFightAccept(client, guildId, fight.id, opponentId);
 
     await handleFightResult(client, guildId, challengerId, 'accept', fight.id);
-    const result = await handleFightResult(client, guildId, opponentId, 'accept', fight.id);
-    assert.equal(result.outcome, 'dispute', 'Both claiming win should create a dispute');
+    const result = await handleFightResult(client, guildId, opponentId, 'dispute', fight.id);
+    assert.equal(result.outcome, 'dispute', 'Dispute action should create a dispute');
 
     const updatedFight = await getFight(client, fight.id);
     assert.equal(updatedFight.status, 'ticket_required');
@@ -222,7 +222,7 @@ test('staff can resolve a fight dispute by paying the challenger', async () => {
     const fight = await handleFightChallenge(client, guildId, challengerId, opponentId, 1_000_000);
     await handleFightAccept(client, guildId, fight.id, opponentId);
     await handleFightResult(client, guildId, challengerId, 'accept', fight.id);
-    await handleFightResult(client, guildId, opponentId, 'accept', fight.id);
+    await handleFightResult(client, guildId, opponentId, 'dispute', fight.id);
 
     const resolvedFight = await resolveFightDispute(client, guildId, fight.id, 'pay_challenger', 'admin123');
     assert.equal(resolvedFight.status, 'completed');
@@ -255,7 +255,7 @@ test('staff can resolve a fight dispute by refunding both fighters', async () =>
     const fight = await handleFightChallenge(client, guildId, challengerId, opponentId, 1_000_000);
     await handleFightAccept(client, guildId, fight.id, opponentId);
     await handleFightResult(client, guildId, challengerId, 'accept', fight.id);
-    await handleFightResult(client, guildId, opponentId, 'accept', fight.id);
+    await handleFightResult(client, guildId, opponentId, 'dispute', fight.id);
 
     const resolvedFight = await resolveFightDispute(client, guildId, fight.id, 'refund_both', 'admin456');
     assert.equal(resolvedFight.status, 'cancelled');
@@ -271,7 +271,7 @@ test('staff can resolve a fight dispute by refunding both fighters', async () =>
     assert.equal(opponentBalance.wallet, 10_000_000);
 });
 
-test('fight refunds both when both decline', async () => {
+test('fight-results decline confirmation is rejected', async () => {
     const client = createClient();
     const guildId = '100000000000000007';
     const challengerId = '200000000000000071';
@@ -287,16 +287,10 @@ test('fight refunds both when both decline', async () => {
     const fight = await handleFightChallenge(client, guildId, challengerId, opponentId, 1_000_000);
     await handleFightAccept(client, guildId, fight.id, opponentId);
 
-    await handleFightResult(client, guildId, challengerId, 'decline', fight.id);
-    const result = await handleFightResult(client, guildId, opponentId, 'decline', fight.id);
-    assert.equal(result.outcome, 'refunded', 'Both declining should refund both fighters');
-
-    const [challengerBalance, opponentBalance] = await Promise.all([
-        getEconomyData(client, guildId, challengerId),
-        getEconomyData(client, guildId, opponentId),
-    ]);
-    assert.equal(challengerBalance.wallet, 10_000_000, 'Both should be refunded');
-    assert.equal(opponentBalance.wallet, 10_000_000, 'Both should be refunded');
+    await assert.rejects(
+        () => handleFightResult(client, guildId, challengerId, 'decline', fight.id),
+        /Invalid confirmation/,
+    );
 });
 
 test('expirePendingFights refunds pending fights and auto-resolves reported active fights', async () => {
@@ -370,7 +364,7 @@ test('expirePendingFights skips ticket_required fights', async () => {
     const fight = await handleFightChallenge(client, guildId, userA, userB, 1_000_000);
     await handleFightAccept(client, guildId, fight.id, userB);
     await handleFightResult(client, guildId, userA, 'accept', fight.id);
-    const result = await handleFightResult(client, guildId, userB, 'accept', fight.id);
+    const result = await handleFightResult(client, guildId, userB, 'dispute', fight.id);
     assert.equal(result.outcome, 'dispute');
 
     const storedFight = await getFight(client, fight.id);

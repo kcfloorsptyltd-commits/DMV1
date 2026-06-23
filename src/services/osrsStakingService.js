@@ -193,8 +193,8 @@ export async function handleFightReport(client, guildId, reporterId, winnerId, f
 }
 
 export async function handleFightResult(client, guildId, userId, confirmation, fightId = null) {
-    if (confirmation !== 'accept' && confirmation !== 'decline') {
-        throw new Error('Invalid confirmation. Use "accept" (you won) or "decline" (you lost).');
+    if (confirmation !== 'accept' && confirmation !== 'dispute') {
+        throw new Error('Invalid confirmation. Use "accept" (agree with reported result) or "dispute" (open a ticket).');
     }
 
     const fight = await findUserFight(client, guildId, userId, fightId, [FIGHT_STATUSES.ACTIVE]);
@@ -211,6 +211,17 @@ export async function handleFightResult(client, guildId, userId, confirmation, f
         throw new Error('You have already submitted your fight result confirmation.');
     }
 
+    if (confirmation === 'accept' && !fight.reported_winner) {
+        const latestFight = await getFight(client, fight.id);
+        if (latestFight?.reported_winner) {
+            fight.reported_winner = latestFight.reported_winner;
+            fight.reportedAt = latestFight.reportedAt || new Date().toISOString();
+        } else {
+            fight.reported_winner = userId;
+            fight.reportedAt = new Date().toISOString();
+        }
+    }
+
     fight[confirmField] = confirmation;
     await saveFight(client, fight);
 
@@ -221,24 +232,20 @@ export async function handleFightResult(client, guildId, userId, confirmation, f
         return { fight, outcome: 'waiting' };
     }
 
-    if (challengerConfirmed === 'decline' && opponentConfirmed === 'decline') {
-        const refunded = await refundFight(client, fight.id);
-        return { fight: refunded, outcome: 'refunded' };
+    if (challengerConfirmed === 'dispute' || opponentConfirmed === 'dispute') {
+        const disputed = await updateFightStatus(client, fight.id, FIGHT_STATUSES.TICKET_REQUIRED, null, {});
+        return { fight: disputed, outcome: 'dispute' };
     }
 
-    const challengerWon = challengerConfirmed === 'accept' && opponentConfirmed === 'decline';
-    const opponentWon = challengerConfirmed === 'decline' && opponentConfirmed === 'accept';
-
-    if (challengerWon || opponentWon) {
-        const winnerId = challengerWon ? fight.challenger_id : fight.opponent_id;
+    if (challengerConfirmed === 'accept' && opponentConfirmed === 'accept') {
+        const winnerId = fight.reported_winner;
         const resolved = await payoutFightWinner(client, fight.id, winnerId, {
             source: 'dual_confirmation',
         });
         return { fight: resolved, outcome: 'resolved', winnerId };
     }
 
-    const disputed = await updateFightStatus(client, fight.id, FIGHT_STATUSES.TICKET_REQUIRED, null, {});
-    return { fight: disputed, outcome: 'dispute' };
+    throw new Error(`Invalid fight result state: challenger=${challengerConfirmed}, opponent=${opponentConfirmed}`);
 }
 
 export async function resolveFightDispute(client, guildId, fightId, resolution, resolverId) {
@@ -299,9 +306,11 @@ export async function resolveFightFromWebhook(client, guildId, killerName, victi
     const killerConfirmField = isKillerChallenger ? 'challengerConfirmed' : 'opponentConfirmed';
     const victimConfirmField = isKillerChallenger ? 'opponentConfirmed' : 'challengerConfirmed';
 
-    // Detect conflict: if the victim previously confirmed "accept" (claimed they won), that's a dispute
-    if (fight[victimConfirmField] === 'accept') {
+    // Detect conflict: if the victim previously disputed the killer report, route to ticket
+    if (fight[victimConfirmField] === 'dispute') {
         fight[killerConfirmField] = 'accept';
+        fight.reported_winner = killerLink.userId;
+        fight.reportedAt = new Date().toISOString();
         await saveFight(client, fight);
         const disputed = await updateFightStatus(client, fight.id, FIGHT_STATUSES.TICKET_REQUIRED, null, {});
         return { fight: disputed, outcome: 'dispute' };
@@ -309,10 +318,12 @@ export async function resolveFightFromWebhook(client, guildId, killerName, victi
 
     // Auto-confirm killer as winner
     fight[killerConfirmField] = 'accept';
+    fight.reported_winner = killerLink.userId;
+    fight.reportedAt = new Date().toISOString();
     await saveFight(client, fight);
 
-    // If victim has already confirmed their loss, resolve immediately
-    if (fight[victimConfirmField] === 'decline') {
+    // If victim has already accepted this reported winner, resolve immediately
+    if (fight[victimConfirmField] === 'accept') {
         const resolved = await payoutFightWinner(client, fight.id, killerLink.userId, {
             source: 'webhook',
         });
