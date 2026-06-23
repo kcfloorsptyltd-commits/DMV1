@@ -18,6 +18,20 @@ export function createFightParticipantMentions(fight) {
     return `<@${fight.challenger_id}> <@${fight.opponent_id}>`;
 }
 
+export function getFightDisputeOutcomeLines(fight, resolution) {
+    const payouts = resolution === 'refund'
+        ? [
+            { userId: fight.challenger_id, amount: fight.amount },
+            { userId: fight.opponent_id, amount: fight.amount },
+        ]
+        : [
+            { userId: fight.challenger_id, amount: resolution === 'challenger' ? fight.amount * 2 : 0 },
+            { userId: fight.opponent_id, amount: resolution === 'opponent' ? fight.amount * 2 : 0 },
+        ];
+
+    return payouts.map(({ userId, amount }) => `• <@${userId}> received: ${formatCurrency(amount)}`);
+}
+
 export function createFightActionRow(fightId, disabled = false) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -217,15 +231,7 @@ export function createFightDisputeResolvedEmbed(fight, resolvedBy, resolution) {
             ? 'Pay Challenger'
             : 'Pay Opponent';
 
-    const outcomeLines = resolution === 'refund'
-        ? [
-            `• <@${fight.challenger_id}> received: ${formatCurrency(fight.amount)}`,
-            `• <@${fight.opponent_id}> received: ${formatCurrency(fight.amount)}`,
-        ]
-        : [
-            `• <@${fight.challenger_id}> received: ${resolution === 'challenger' ? formatCurrency(fight.amount * 2) : formatCurrency(0)}`,
-            `• <@${fight.opponent_id}> received: ${resolution === 'opponent' ? formatCurrency(fight.amount * 2) : formatCurrency(0)}`,
-        ];
+    const outcomeLines = getFightDisputeOutcomeLines(fight, resolution);
 
     return createEmbed({
         title: '✅ Dispute Resolved',

@@ -1,6 +1,5 @@
 import { MessageFlags } from 'discord.js';
 import { createEmbed, errorEmbed } from '../../utils/embeds.js';
-import { formatCurrency } from '../../utils/economy.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { resolveDisputeFight } from '../../services/osrsStakingService.js';
 import { getFight } from '../../utils/database/fights.js';
@@ -8,6 +7,7 @@ import {
     createFightParticipantMentions,
     createFightDisputeResolutionRow,
     createFightDisputeResolvedEmbed,
+    getFightDisputeOutcomeLines,
 } from '../../utils/osrsStakingPresentation.js';
 import { logger } from '../../utils/logger.js';
 import { isAuthorizedOsrsAdmin } from '../../utils/osrsAdminAuth.js';
@@ -20,23 +20,6 @@ async function notifyUser(client, userId, content) {
     } catch (error) {
         logger.warn('[FIGHT_DISPUTE_RESOLVE] Failed to DM user', { userId, error: error.message });
     }
-}
-
-function buildOutcomeLines(fight, resolution) {
-    if (resolution === 'refund') {
-        return [
-            `<@${fight.challenger_id}> received: ${formatCurrency(fight.amount)}`,
-            `<@${fight.opponent_id}> received: ${formatCurrency(fight.amount)}`,
-        ];
-    }
-
-    const challengerAmount = resolution === 'challenger' ? fight.amount * 2 : 0;
-    const opponentAmount = resolution === 'opponent' ? fight.amount * 2 : 0;
-
-    return [
-        `<@${fight.challenger_id}> received: ${formatCurrency(challengerAmount)}`,
-        `<@${fight.opponent_id}> received: ${formatCurrency(opponentAmount)}`,
-    ];
 }
 
 function buildDmSummary(fight, resolvedBy, resolution) {
@@ -53,7 +36,7 @@ function buildDmSummary(fight, resolvedBy, resolution) {
         `Resolved by: <@${resolvedBy}>`,
         '',
         'Outcome:',
-        ...buildOutcomeLines(fight, resolution).map((line) => `• ${line}`),
+        ...getFightDisputeOutcomeLines(fight, resolution),
     ].join('\n');
 }
 
