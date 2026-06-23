@@ -57,7 +57,7 @@ export default {
         const errMsg = result && result.error ? result.error : 'Failed to remove money';
         let body = errMsg;
         if (result && result.current !== undefined) {
-          body += ` (current: ${formatCurrency(result.current, { short: true, noSymbol: true })}${result.required ? `, required: ${formatCurrency(result.required, { short: true, noSymbol: true })}` : ''})`;
+          body += ` (current: ${formatCurrency(result.current, { short: true })}${result.required ? `, required: ${formatCurrency(result.required, { short: true })}` : ''})`;
         }
         await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed(body)] });
         return;
@@ -68,12 +68,12 @@ export default {
 
       const embed = createEmbed({
         title: 'Balance Updated',
-        description: `Removed ${formatCurrency(amountStr, { short: true, noSymbol: true })} from ${target.username}'s ${fieldName}`,
+        description: `Removed ${formatCurrency(amountStr, { short: true })} from ${target.username}'s ${fieldName}`,
       })
         .addFields(
           { name: 'User', value: `${target.tag} (${target.id})`, inline: true },
-          { name: `Before (${fieldName})`, value: `${formatCurrency((type === 'bank' ? before.bank : before.wallet) || 0, { short: true, noSymbol: true })}`, inline: true },
-          { name: `After (${fieldName})`, value: `${formatCurrency(afterValue || 0, { short: true, noSymbol: true })}`, inline: true }
+          { name: `Before (${fieldName})`, value: `${formatCurrency((type === 'bank' ? before.bank : before.wallet) || 0, { short: true })}`, inline: true },
+          { name: `After (${fieldName})`, value: `${formatCurrency(afterValue || 0, { short: true })}`, inline: true }
         )
         .setFooter({ text: `Requested by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
 

@@ -51,7 +51,7 @@ export default {
 
         const embed = createEmbed({
             title: `${targetUser.username}'s GP Wallet`,
-            description: `${formatCurrency(wallet, { short: true, noSymbol: true })}`,
+            description: `${formatCurrency(wallet, { short: true })}`,
         })
             .setFooter({ text: `Requested by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
 
