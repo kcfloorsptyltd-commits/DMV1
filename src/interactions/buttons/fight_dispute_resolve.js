@@ -12,8 +12,15 @@ import {
 import { logger } from '../../utils/logger.js';
 
 async function sendResolutionDm(client, userId, embed) {
-    const user = await client.users.fetch(userId);
-    await user.send({ embeds: [embed] });
+    try {
+        const user = await client.users.fetch(userId);
+        await user.send({ embeds: [embed] });
+    } catch (error) {
+        logger.warn('[FIGHT_DISPUTE_RESOLVE] Failed to send dispute resolution DM', {
+            userId,
+            error: error.message,
+        });
+    }
 }
 
 function createResolutionDmEmbed(fight, resolverId) {

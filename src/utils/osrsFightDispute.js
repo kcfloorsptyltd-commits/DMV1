@@ -39,10 +39,22 @@ export async function createFightDisputeTicket(client, guild, member, fight) {
             return null;
         }
 
-        await Promise.allSettled([
+        const accessResults = await Promise.allSettled([
             grantTicketAccess(result.channel, fight.challenger_id),
             grantTicketAccess(result.channel, fight.opponent_id),
         ]);
+
+        accessResults.forEach((resultEntry, index) => {
+            if (resultEntry.status === 'rejected') {
+                const userId = index === 0 ? fight.challenger_id : fight.opponent_id;
+                logger.warn('[OSRS_FIGHT_DISPUTE] Failed to grant fighter access to dispute ticket', {
+                    fightId: fight.id,
+                    channelId: result.channel.id,
+                    userId,
+                    error: resultEntry.reason?.message || String(resultEntry.reason),
+                });
+            }
+        });
 
         const staffMention = config.ticketStaffRoleId ? ` <@&${config.ticketStaffRoleId}>` : '';
         await result.channel.send({
