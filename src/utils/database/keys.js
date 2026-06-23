@@ -68,3 +68,11 @@ export function getJoinToCreateConfigKey(guildId) {
 export function getJoinToCreateChannelsKey(guildId) {
     return `guild:${guildId}:jointocreate:channels`;
 }
+
+export function getPvpStatsKey(guildId, playerName) {
+    return `guild:${guildId}:pvp:stats:${playerName.toLowerCase()}`;
+}
+
+export function getPvpRecentKey(guildId) {
+    return `guild:${guildId}:pvp:recent`;
+}

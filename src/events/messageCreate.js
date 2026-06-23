@@ -17,6 +17,7 @@ import {
   isValidCountingMessage,
   recordCorrectCount,
 } from '../services/countingGameService.js';
+import { recordPvpKill } from '../utils/database/pvp.js';
 
 const MESSAGE_XP_RATE_LIMIT_ATTEMPTS = 12;
 const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
@@ -33,6 +34,8 @@ export default {
       if (countingProcessed) {
         return;
       }
+
+      await handlePvpEvent(message);
 
       await handlePrefixCommand(message, client);
 
@@ -219,5 +222,39 @@ async function handleLeveling(message, client) {
     }
   } catch (error) {
     logger.error('Error handling leveling for message:', error);
+  }
+}
+
+/**
+ * Parse OSRS-style PvP kill messages and record them.
+ *
+ * Supported formats (case-insensitive):
+ *   "PlayerA has defeated PlayerB"
+ *   "PlayerA defeated PlayerB"
+ *   "PlayerA has been defeated by PlayerB"  (victim perspective — roles reversed)
+ */
+async function handlePvpEvent(message) {
+  try {
+    const content = message.content.trim();
+    if (!content) return;
+
+    // Pattern 1 (checked first): "Victim has been defeated by Killer"
+    const deathMatch = content.match(/^(.+?)\s+has\s+been\s+defeated\s+by\s+(.+)$/i);
+    if (deathMatch) {
+      const victim = deathMatch[1].trim();
+      const killer = deathMatch[2].trim();
+      await recordPvpKill(message.guild.id, killer, victim);
+      return;
+    }
+
+    // Pattern 2: "Killer has defeated Victim" or "Killer defeated Victim"
+    const killMatch = content.match(/^(.+?)\s+(?:has\s+)?defeated\s+(.+)$/i);
+    if (killMatch) {
+      const killer = killMatch[1].trim();
+      const victim = killMatch[2].trim();
+      await recordPvpKill(message.guild.id, killer, victim);
+    }
+  } catch (error) {
+    logger.error('Error handling PvP event:', error);
   }
 }
