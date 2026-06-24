@@ -1,7 +1,6 @@
 import { errorEmbed } from '../../utils/embeds.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { handleFightResult } from '../../services/osrsStakingService.js';
-import { getFight, saveFight } from '../../utils/database/fights.js';
+import { getFight, saveFight, payoutFightWinner, refundFight } from '../../utils/database/fights.js';
 import { createFightDisputeTicket } from '../../utils/osrsFightDispute.js';
 import {
     createFightCancelledEmbed,
@@ -28,7 +27,7 @@ export default {
         const [action, fightId] = args;
 
         try {
-            if (!fightId || !['accept', 'decline'].includes(action)) {
+            if (!fightId || !['accept', 'dispute'].includes(action)) {
                 throw new Error('Invalid fight result button.');
             }
 
@@ -46,43 +45,83 @@ export default {
                 throw new Error('Only the opposing fighter can use these confirmation buttons.');
             }
 
-            const { fight, outcome } = await handleFightResult(client, interaction.guildId, interaction.user.id, action, fightId);
-            const disabledRow = createFightResultConfirmationRow(fight.id, true);
+            const disabledRow = createFightResultConfirmationRow(currentFight.id, true);
 
-            if (outcome === 'resolved') {
+            if (action === 'accept') {
+                // Accept button: confirm they accept the reported result
+                const isChallenger = currentFight.challenger_id === interaction.user.id;
+                const confirmField = isChallenger ? 'challengerConfirmed' : 'opponentConfirmed';
+
+                currentFight[confirmField] = 'accept';
+                await saveFight(client, currentFight);
+
+                const challengerConfirmed = currentFight.challengerConfirmed;
+                const opponentConfirmed = currentFight.opponentConfirmed;
+
+                // Both accepted - resolve immediately with reported winner
+                if (challengerConfirmed === 'accept' && opponentConfirmed === 'accept') {
+                    const winnerId = currentFight.reported_winner;
+                    const resolved = await payoutFightWinner(client, currentFight.id, winnerId, {
+                        source: 'dual_confirmation',
+                    });
+                    await interaction.update({
+                        embeds: [createFightCompletedEmbed(resolved)],
+                        components: [disabledRow],
+                    });
+                    return;
+                }
+
+                // One accepted, one declined - resolve with winner
+                if ((challengerConfirmed === 'accept' && opponentConfirmed === 'decline') ||
+                    (challengerConfirmed === 'decline' && opponentConfirmed === 'accept')) {
+                    const winnerId = currentFight.reported_winner;
+                    const resolved = await payoutFightWinner(client, currentFight.id, winnerId, {
+                        source: 'dual_confirmation',
+                    });
+                    await interaction.update({
+                        embeds: [createFightCompletedEmbed(resolved)],
+                        components: [disabledRow],
+                    });
+                    return;
+                }
+
+                // Both declined - refund both
+                if (challengerConfirmed === 'decline' && opponentConfirmed === 'decline') {
+                    const refunded = await refundFight(client, currentFight.id);
+                    await interaction.update({
+                        embeds: [createFightCancelledEmbed(refunded, 'Both fighters declined. Both stakes have been refunded.')],
+                        components: [disabledRow],
+                    });
+                    return;
+                }
+
+                // Still waiting for other fighter
                 await interaction.update({
-                    embeds: [createFightCompletedEmbed(fight)],
+                    embeds: [createFightCompletedEmbed(currentFight)],
                     components: [disabledRow],
                 });
                 return;
             }
 
-            if (outcome === 'refunded') {
-                await interaction.update({
-                    embeds: [createFightCancelledEmbed(fight, 'Both fighters confirmed the fight is cancelled. Both stakes have been refunded.')],
-                    components: [disabledRow],
-                });
-                return;
-            }
-
-            if (outcome === 'dispute') {
-                const ticketChannel = await createFightDisputeTicket(client, interaction.guild, interaction.member, fight);
+            if (action === 'dispute') {
+                // Dispute button: create ticket and hold funds in escrow
+                const ticketChannel = await createFightDisputeTicket(client, interaction.guild, interaction.member, currentFight);
+                
                 if (ticketChannel) {
-                    const updatedFight = await getFight(client, fight.id);
+                    const updatedFight = await getFight(client, fightId);
                     if (updatedFight) {
                         updatedFight.ticketId = ticketChannel.id;
+                        updatedFight.status = 'ticket_required';
                         await saveFight(client, updatedFight);
                     }
                 }
 
                 await interaction.update({
-                    embeds: [createFightDisputeEmbed(fight, ticketChannel?.id || null)],
+                    embeds: [createFightDisputeEmbed(currentFight, ticketChannel?.id || null)],
                     components: [disabledRow],
                 });
                 return;
             }
-
-            throw new Error('Unexpected fight result state.');
         } catch (error) {
             await InteractionHelper.safeReply(interaction, {
                 embeds: [errorEmbed(error.message)],
