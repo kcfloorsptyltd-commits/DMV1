@@ -178,8 +178,31 @@ export default {
                         return;
                     }
 
-                    // Both claim they won → dispute
+                    // Both claim they won → dispute (create ticket, hold funds)
                     if (challengerConfirmed === 'won' && opponentConfirmed === 'won') {
+                        try {
+                            // Check if ticket already exists to prevent duplicate tickets
+                            if (updatedFight.ticketId) {
+                                return; // Ticket already created, don't duplicate
+                            }
+
+                            const ticketChannel = await createFightDisputeTicket(client, interaction.guild, interaction.member, updatedFight);
+                            if (ticketChannel) {
+                                updatedFight.ticketId = ticketChannel.id;
+                                updatedFight.status = 'ticket_required';
+                                await saveFight(client, updatedFight);
+                            }
+                            await logFightStage(client, updatedFight, 'ticket_created');
+                            const disputeMessage = await sendDisputeMessage(interaction, updatedFight);
+                            scheduleFightCleanup(interaction.message, [disputeMessage].filter(Boolean));
+                        } catch (error) {
+                            // Silently log
+                        }
+                        return;
+                    }
+
+                    // Both claim they lost → dispute (create ticket, hold funds)
+                    if (challengerConfirmed === 'lost' && opponentConfirmed === 'lost') {
                         try {
                             // Check if ticket already exists to prevent duplicate tickets
                             if (updatedFight.ticketId) {
@@ -223,26 +246,6 @@ export default {
                             const resultMessages = await sendResultMessages(interaction, winnerId, loserId);
                             scheduleFightCleanup(interaction.message, resultMessages);
                         } catch (payoutError) {
-                            // Silently log
-                        }
-                        return;
-                    }
-
-                    // Both claim they lost → refund both
-                    if (challengerConfirmed === 'lost' && opponentConfirmed === 'lost') {
-                        try {
-                            // Check if already refunded to prevent duplicate refunds
-                            if (updatedFight.fundsRefunded) {
-                                return; // Already refunded, don't process again
-                            }
-
-                            await refundFight(client, updatedFight.id);
-                            const loserMessages = await sendLoserMessages(interaction, [
-                                updatedFight.challenger_id,
-                                updatedFight.opponent_id,
-                            ]);
-                            scheduleFightCleanup(interaction.message, loserMessages);
-                        } catch (refundError) {
                             // Silently log
                         }
                         return;
