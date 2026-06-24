@@ -14,6 +14,11 @@ import {
     updateFightStatus,
 } from '../utils/database/fights.js';
 import { getApprovedOsrsLink, getOsrsLinkByUsername } from '../utils/database/osrs.js';
+import {
+    editFightEmbed,
+    createAutoReleaseEmbed,
+    createExpiredEmbed,
+} from '../utils/fightResultPresentation.js';
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
@@ -27,18 +32,6 @@ function isFightExpired(fight) {
     return Boolean(fight?.expiresAt) && new Date(fight.expiresAt).getTime() <= Date.now();
 }
 
-async function notifyUser(client, userId, content) {
-    try {
-        if (!client?.users?.fetch) {
-            return;
-        }
-
-        const user = await client.users.fetch(userId);
-        await user.send(content);
-    } catch (error) {
-        logger.warn('[OSRS_FIGHT] Failed to DM user', { userId, error: error.message });
-    }
-}
 
 export async function findUserFight(client, guildId, userId, fightId = null, statuses = [FIGHT_STATUSES.PENDING, FIGHT_STATUSES.ACTIVE]) {
     if (fightId) {
@@ -339,16 +332,12 @@ export async function expirePendingFights(client) {
                 source: 'report_timeout',
                 reported_winner: fight.reported_winner,
             });
-            await Promise.allSettled([
-                notifyUser(client, fight.challenger_id, `Your OSRS fight ${fight.id} was auto-resolved in favor of <@${fight.reported_winner}> after time expired.`),
-                notifyUser(client, fight.opponent_id, `Your OSRS fight ${fight.id} was auto-resolved in favor of <@${fight.reported_winner}> after time expired.`),
-            ]);
+            // Update the shared embed to AUTO COMPLETED state
+            await editFightEmbed(client, resolvedFight, createAutoReleaseEmbed(resolvedFight));
         } else {
             resolvedFight = await refundFight(client, fight.id);
-            await Promise.allSettled([
-                notifyUser(client, fight.challenger_id, `Your OSRS fight ${fight.id} expired and both stakes were refunded.`),
-                notifyUser(client, fight.opponent_id, `Your OSRS fight ${fight.id} expired and both stakes were refunded.`),
-            ]);
+            // Update the shared embed to EXPIRED state
+            await editFightEmbed(client, resolvedFight, createExpiredEmbed(resolvedFight));
         }
 
         results.push(resolvedFight);

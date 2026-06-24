@@ -9,6 +9,11 @@ import {
     formatFightPayoutSummary,
     getFightResolutionLabel,
 } from '../../utils/osrsStakingPresentation.js';
+import {
+    editFightEmbed,
+    createCompletedEmbed,
+    createExpiredEmbed,
+} from '../../utils/fightResultPresentation.js';
 import { logger } from '../../utils/logger.js';
 
 async function sendResolutionDm(client, userId, embed) {
@@ -61,6 +66,7 @@ export default {
             const fight = await resolveFightDispute(client, interaction.guildId, fightId, resolution, interaction.user.id);
             const resolutionEmbed = createFightDisputeResolvedEmbed(fight, interaction.user.id);
 
+            // Disable the dispute resolution buttons in the ticket channel
             await interaction.message.edit({
                 components: [createFightDisputeResolutionRow(fight.id, true)],
             }).catch((error) => {
@@ -70,6 +76,7 @@ export default {
                 });
             });
 
+            // Post the resolution summary in the ticket channel
             if (interaction.channel) {
                 await interaction.channel.send({
                     content: `<@${fight.challenger_id}> <@${fight.opponent_id}>`,
@@ -78,6 +85,12 @@ export default {
                 });
             }
 
+            // Update the original fight embed in the main channel
+            const isRefund = fight.disputeResolution === 'refund_both' || fight.status === 'cancelled';
+            const resolvedEmbed = isRefund ? createExpiredEmbed(fight) : createCompletedEmbed(fight);
+            await editFightEmbed(client, fight, resolvedEmbed);
+
+            // DM both fighters with the resolution details
             const dmEmbed = createResolutionDmEmbed(fight, interaction.user.id);
             await Promise.allSettled([
                 sendResolutionDm(client, fight.challenger_id, dmEmbed),
