@@ -14,8 +14,6 @@ const FIGHT_RESULT_MESSAGES = {
     winner: '🎉 Congratulations you have won and the funds have been awarded to your balance',
     loser: '😢 Oh nooo better luck next time!',
     dispute: '⚠️ Oh noo a dispute has been made please come to the ticket',
-    opponentWon: '⚠️ Your opponent has chosen: I Won',
-    opponentLost: '⚠️ Your opponent has chosen: I Lost',
 };
 
 async function deleteMessage(message) {
@@ -91,22 +89,6 @@ async function sendDisputeMessage(interaction, fight) {
     return disputeMessage || null;
 }
 
-async function sendOpponentChoiceMessage(interaction, opponentId, choice) {
-    if (!interaction.channel?.send) {
-        return null;
-    }
-
-    const message = choice === 'won' ? FIGHT_RESULT_MESSAGES.opponentWon : FIGHT_RESULT_MESSAGES.opponentLost;
-    const [choiceMessage] = await sendTemporaryMessages([
-        interaction.channel.send({
-            content: `<@${opponentId}> ${message}`,
-            allowedMentions: { users: [opponentId] },
-        }),
-    ]);
-
-    return choiceMessage || null;
-}
-
 export default {
     name: 'fight_result',
     async execute(interaction, client, args) {
@@ -180,10 +162,27 @@ export default {
                         const waitingForId = challengerConfirmed === null
                             ? updatedFight.challenger_id
                             : updatedFight.opponent_id;
+                        
+                        // Update the current message for the player who just clicked
                         await interaction.editReply({
                             embeds: [createFightResultWaitingEmbed(updatedFight, waitingForId)],
                             components: [createFightResultConfirmationRow(updatedFight.id)],
                         });
+
+                        // Send a follow-up to the OTHER fighter showing they're waiting
+                        try {
+                            const otherFighterId = isChallenger ? updatedFight.opponent_id : updatedFight.challenger_id;
+                            const otherFighter = await client.users.fetch(otherFighterId);
+                            if (otherFighter && interaction.channel) {
+                                await interaction.channel.send({
+                                    content: `<@${otherFighterId}>`,
+                                    embeds: [createFightResultWaitingEmbed(updatedFight, waitingForId)],
+                                    components: [createFightResultConfirmationRow(updatedFight.id)],
+                                });
+                            }
+                        } catch (error) {
+                            // Silently log if we can't notify the other fighter
+                        }
                         return;
                     }
 
