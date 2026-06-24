@@ -7,6 +7,7 @@ import { logger } from '../../utils/logger.js';
 
 // Use Unicode escape to ensure the emoji is preserved in all environments
 const MONEY_EMOJI = '\u{1F4B0}';
+const AUTO_DELETE_DELAY = 10000; // 10 seconds
 
 export default {
   data: new SlashCommandBuilder()
@@ -101,6 +102,15 @@ export default {
         logger.error('Failed to send cleaned embed for remove.balance', err);
         await InteractionHelper.safeEditReply(interaction, { embeds: [embed] });
       }
+
+      // Auto-delete after 10 seconds
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (error) {
+          logger.debug('Could not auto-delete remove message', { error: error.message });
+        }
+      }, AUTO_DELETE_DELAY);
     }
   }, { command: 'remove' })
 };

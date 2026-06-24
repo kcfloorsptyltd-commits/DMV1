@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { createEmbed } from '../../utils/embeds.js';
 import { getEconomyData } from '../../utils/economy.js';
 import { getPvpStats, getRecentPvpEvents } from '../../utils/database/pvp.js';
@@ -14,6 +14,8 @@ import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { logger } from '../../utils/logger.js';
 import { OSRS_LINK_STATUSES } from '../../utils/database/osrs.js';
+
+const AUTO_DELETE_DELAY = 10000; // 10 seconds
 
 function formatUpdatedFooter(date = new Date()) {
     const iso = date.toISOString().replace('T', ' ').slice(0, 16);
@@ -52,7 +54,7 @@ export default {
         .setDMPermission(false),
 
     execute: withErrorHandling(async (interaction, _config, client) => {
-        const deferred = await InteractionHelper.safeDefer(interaction);
+        const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
         if (!deferred) return;
 
         const guildId = interaction.guildId;
@@ -150,5 +152,14 @@ export default {
         });
 
         await InteractionHelper.safeEditReply(interaction, { embeds: [embed] });
+
+        // Auto-delete after 10 seconds
+        setTimeout(async () => {
+            try {
+                await interaction.deleteReply();
+            } catch (error) {
+                logger.debug('Could not auto-delete profile message', { error: error.message });
+            }
+        }, AUTO_DELETE_DELAY);
     }, { command: 'profile' }),
 };

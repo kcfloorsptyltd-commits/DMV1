@@ -9,6 +9,8 @@ import { getGuildConfig } from '../../services/guildConfig.js';
 import { createRemovalApprovalEmbed, createRemovalApprovalRow } from '../../utils/osrsStakingPresentation.js';
 import { logger } from '../../utils/logger.js';
 
+const AUTO_DELETE_DELAY = 10000; // 10 seconds
+
 export default {
     data: new SlashCommandBuilder()
         .setName('unlink-osrs')
@@ -114,6 +116,15 @@ export default {
                     }),
                 ],
             });
+
+            // Auto-delete after 10 seconds
+            setTimeout(async () => {
+                try {
+                    await interaction.deleteReply();
+                } catch (error) {
+                    logger.debug('Could not auto-delete unlink-osrs message', { error: error.message });
+                }
+            }, AUTO_DELETE_DELAY);
         } catch (error) {
             await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed(error.message)] });
         }

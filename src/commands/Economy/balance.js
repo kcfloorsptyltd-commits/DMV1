@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } from 'discord.js';
 import { createEmbed, errorEmbed, successEmbed, infoEmbed, warningEmbed } from '../../utils/embeds.js';
 import { getEconomyData, getMaxBankCapacity, formatCurrency } from '../../utils/economy.js';
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -7,6 +7,7 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 // Use Unicode escape to ensure the emoji is preserved in all environments
 const MONEY_EMOJI = '\u{1F4B0}';
+const AUTO_DELETE_DELAY = 10000; // 10 seconds
 
 export default {
     data: new SlashCommandBuilder()
@@ -20,7 +21,7 @@ export default {
         ),
 
     execute: withErrorHandling(async (interaction, config, client) => {
-        const deferred = await InteractionHelper.safeDefer(interaction);
+        const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
         if (!deferred) return;
 
         const userOption = interaction.options.getUser("user");
@@ -115,5 +116,14 @@ export default {
             logger.error('Failed to send cleaned embed for balance', err);
             await InteractionHelper.safeEditReply(interaction, { embeds: [embed] });
         }
+
+        // Auto-delete after 10 seconds
+        setTimeout(async () => {
+            try {
+                await interaction.deleteReply();
+            } catch (error) {
+                logger.debug('Could not auto-delete balance message', { error: error.message });
+            }
+        }, AUTO_DELETE_DELAY);
     }, { command: 'balance' })
 };
