@@ -16,18 +16,34 @@ export default {
         const [action, fightId] = args;
 
         try {
-            if (action === 'accept') {
-                const fight = await handleFightAccept(client, interaction.guildId, fightId, interaction.user.id);
-                await interaction.update({
-                    embeds: [createFightActiveEmbed(fight)],
-                    components: [createFightResultConfirmationRow(fight.id)],
+            const fight = await getFight(client, fightId);
+            if (!fight) {
+                throw new Error('Fight not found.');
+            }
+
+            // Verify user is part of this fight
+            const isChallenger = fight.challenger_id === interaction.user.id;
+            const isOpponent = fight.opponent_id === interaction.user.id;
+            if (!isChallenger && !isOpponent) {
+                await InteractionHelper.safeReply(interaction, {
+                    embeds: [errorEmbed('You are not part of this fight.')],
+                    ephemeral: true,
                 });
-                await logFightStage(client, fight, 'accepted');
+                return;
+            }
+
+            if (action === 'accept') {
+                const updatedFight = await handleFightAccept(client, interaction.guildId, fightId, interaction.user.id);
+                await interaction.update({
+                    embeds: [createFightActiveEmbed(updatedFight)],
+                    components: [createFightResultConfirmationRow(updatedFight.id)],
+                });
+                await logFightStage(client, updatedFight, 'accepted');
                 return;
             }
 
             if (action === 'decline') {
-                const fight = await handleFightDecline(client, interaction.guildId, fightId, interaction.user.id);
+                const declinedFight = await handleFightDecline(client, interaction.guildId, fightId, interaction.user.id);
                 
                 // Delete the message immediately when fight is declined
                 try {
@@ -35,8 +51,8 @@ export default {
                 } catch (error) {
                     // If message can't be deleted, update it instead
                     await interaction.update({
-                        embeds: [createFightCancelledEmbed(fight, 'The fight was declined and both stakes were refunded.')],
-                        components: [createFightActionRow(fight.id, true, false)],
+                        embeds: [createFightCancelledEmbed(declinedFight, 'The fight was declined and both stakes were refunded.')],
+                        components: [createFightActionRow(fightId, true, false)],
                     });
                 }
                 
@@ -44,13 +60,8 @@ export default {
             }
 
             if (action === 'cancel') {
-                const fight = await getFight(client, fightId);
-                if (!fight) {
-                    throw new Error('Fight not found.');
-                }
-
                 // Only challenger can cancel
-                if (fight.challenger_id !== interaction.user.id) {
+                if (!isChallenger) {
                     await InteractionHelper.safeReply(interaction, {
                         embeds: [errorEmbed('Only the challenger can cancel this fight.')],
                         ephemeral: true,
@@ -67,7 +78,6 @@ export default {
                     return;
                 }
 
-                // Call decline to handle the cancellation (both use same refund logic)
                 const cancelledFight = await handleFightDecline(client, interaction.guildId, fightId, interaction.user.id);
                 
                 // Delete the message immediately when fight is cancelled
