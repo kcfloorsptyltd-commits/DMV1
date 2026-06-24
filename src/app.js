@@ -19,6 +19,9 @@ import { expirePendingFights } from './services/osrsStakingService.js';
 import pkg from '../package.json' with { type: 'json' };
 import { EXPECTED_SCHEMA_VERSION, EXPECTED_SCHEMA_LABEL } from './config/schemaVersion.js';
 
+// Wait for PostgreSQL to initialize before starting bot
+const STARTUP_DELAY_MS = process.env.STARTUP_DELAY_MS ? Number(process.env.STARTUP_DELAY_MS) : 10000;
+
 class TitanBot extends Client {
   constructor() {
     super({
@@ -52,7 +55,11 @@ class TitanBot extends Client {
   async start() {
     try {
       startupLog('Starting TitanBot...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Wait for PostgreSQL to initialize (especially important on container startup)
+      startupLog(`⏳ Waiting ${STARTUP_DELAY_MS}ms for PostgreSQL to initialize...`);
+      await new Promise(resolve => setTimeout(resolve, STARTUP_DELAY_MS));
+      startupLog('✅ Startup delay complete, proceeding with initialization...');
       
       startupLog('Initializing database...');
 
