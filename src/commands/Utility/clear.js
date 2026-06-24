@@ -1,17 +1,15 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { errorEmbed, createEmbed } from '../../utils/embeds.js';
-import { withErrorHandling } from '../../utils/errorHandler.js';
-import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 export default {
     data: new SlashCommandBuilder()
         .setName('clear')
         .setDescription('Clear all messages from a channel'),
 
-    execute: withErrorHandling(async (interaction, _config, client) => {
+    execute: async (interaction, _config, client) => {
         try {
-            // DEFER FIRST
-            await interaction.deferReply({ ephemeral: false });
+            // DEFER FIRST - use native deferReply
+            await interaction.deferReply();
 
             // Check if user is the server owner
             if (interaction.user.id !== interaction.guild.ownerId) {
@@ -75,12 +73,9 @@ export default {
                 await interaction.editReply({
                     embeds: [errorEmbed(`Failed to clear channel: ${error.message}`)],
                 });
-            } catch {
-                await interaction.reply({
-                    embeds: [errorEmbed(`Failed to clear channel: ${error.message}`)],
-                    ephemeral: true,
-                });
+            } catch (replyError) {
+                console.error('[CLEAR] Failed to send error reply:', replyError);
             }
         }
-    }, { command: 'clear' }),
+    },
 };
