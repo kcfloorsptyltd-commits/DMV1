@@ -89,7 +89,40 @@ async function sendDisputeMessage(interaction, fight) {
     return disputeMessage || null;
 }
 
-async function handleDisputeAction(interaction, client, fight) {
+async function handleDisputeActionWithDeferredUpdate(interaction, client, fight) {
+    // Interaction is already deferred, just update it
+    try {
+        await interaction.editReply({
+            components: [createFightResultConfirmationRow(fight.id, true)],
+        });
+    } catch {
+        // If we can't edit, continue anyway
+    }
+
+    // Create ticket and send dispute message in background
+    try {
+        const ticketChannel = await createFightDisputeTicket(client, interaction.guild, interaction.member, fight);
+
+        if (ticketChannel) {
+            fight.ticketId = ticketChannel.id;
+            fight.status = 'ticket_required';
+            await saveFight(client, fight);
+        }
+
+        await logFightStage(client, fight, 'ticket_created');
+        const disputeMessage = await sendDisputeMessage(interaction, fight);
+        scheduleFightCleanup(interaction.message, [disputeMessage].filter(Boolean));
+    } catch (error) {
+        try {
+            await interaction.editReply({ embeds: [errorEmbed(error.message)] });
+        } catch {
+            // Interaction may have expired
+        }
+    }
+}
+
+async function handleDisputeActionWithoutDeferredUpdate(interaction, client, fight) {
+    // Need to defer first
     await interaction.deferUpdate();
 
     // Immediately disable buttons to acknowledge the action
@@ -151,7 +184,7 @@ export default {
 
             // Dispute can be raised at any time by either fighter
             if (action === 'dispute') {
-                await handleDisputeAction(interaction, client, currentFight);
+                await handleDisputeActionWithoutDeferredUpdate(interaction, client, currentFight);
                 return;
             }
 
@@ -188,7 +221,8 @@ export default {
 
             // Both claim they won → dispute
             if (challengerConfirmed === 'won' && opponentConfirmed === 'won') {
-                await handleDisputeAction(interaction, client, updatedFight);
+                await interaction.deferUpdate();
+                await handleDisputeActionWithDeferredUpdate(interaction, client, updatedFight);
                 return;
             }
 
