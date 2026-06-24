@@ -7,10 +7,89 @@ import { getGuildConfigKey } from '../../utils/database.js';
 import { getColor } from '../../config/bot.js';
 import { logger } from '../../utils/logger.js';
 
+const TRACKING_CHANNELS = [
+    {
+        key: 'fundsTrackingChannelId',
+        subcommand: 'set-funds-tracking',
+        setValue: 'set_funds_channel',
+        clearValue: 'clear_funds_channel',
+        selectorId: 'economy_funds_channel',
+        fieldName: '📊 Funds Tracking Channel',
+        selectLabel: 'Set Funds Tracking Channel',
+        clearLabel: 'Clear Funds Tracking Channel',
+        selectDescription: 'Configure where balance transaction logs are sent',
+        clearDescription: 'Disable funds tracking logs',
+        successTitle: '💰 Funds Tracking Configured',
+        successMessage: (channel) => `Funds tracking logs will be sent to ${channel}.\n\nWhen admins use \`/add balance\` or \`/remove balance\`, a detailed transaction log will appear in that channel.\n\n**Visibility:** Only Admins, Server Owner, and Support role can see these logs.`,
+        selectPromptTitle: '💰 Select Funds Tracking Channel',
+        selectPromptDescription: 'Choose where balance transaction logs will be sent.',
+        setConfirmationTitle: '💰 Funds Tracking Set',
+        clearConfirmationTitle: '💰 Funds Tracking Disabled',
+        clearConfirmationMessage: 'Transaction logs will no longer be sent.',
+        emoji: '💰',
+    },
+    {
+        key: 'tradeTrackingChannelId',
+        subcommand: 'set-trade-tracking',
+        setValue: 'set_trade_channel',
+        clearValue: 'clear_trade_channel',
+        selectorId: 'economy_trade_channel',
+        fieldName: '💱 Trade Tracking Channel',
+        selectLabel: 'Set Trade Tracking Channel',
+        clearLabel: 'Clear Trade Tracking Channel',
+        selectDescription: 'Configure where completed trade logs are sent',
+        clearDescription: 'Disable trade tracking logs',
+        successTitle: '💱 Trade Tracking Configured',
+        successMessage: (channel) => `Trade completion logs will be sent to ${channel}.`,
+        selectPromptTitle: '💱 Select Trade Tracking Channel',
+        selectPromptDescription: 'Choose where completed trade logs will be sent.',
+        setConfirmationTitle: '💱 Trade Tracking Set',
+        clearConfirmationTitle: '💱 Trade Tracking Disabled',
+        clearConfirmationMessage: 'Trade logs will no longer be sent.',
+        emoji: '💱',
+    },
+    {
+        key: 'fightTrackingChannelId',
+        subcommand: 'set-fight-tracking',
+        setValue: 'set_fight_channel',
+        clearValue: 'clear_fight_channel',
+        selectorId: 'economy_fight_channel',
+        fieldName: '⚔️ Fight Tracking Channel',
+        selectLabel: 'Set Fight Tracking Channel',
+        clearLabel: 'Clear Fight Tracking Channel',
+        selectDescription: 'Configure where resolved fight logs are sent',
+        clearDescription: 'Disable fight tracking logs',
+        successTitle: '⚔️ Fight Tracking Configured',
+        successMessage: (channel) => `Fight result logs will be sent to ${channel}.\n\n**Visibility:** Only Admins, Server Owner, and Support role can see these logs.`,
+        selectPromptTitle: '⚔️ Select Fight Tracking Channel',
+        selectPromptDescription: 'Choose where resolved fight logs will be sent.',
+        setConfirmationTitle: '⚔️ Fight Tracking Set',
+        clearConfirmationTitle: '⚔️ Fight Tracking Disabled',
+        clearConfirmationMessage: 'Fight logs will no longer be sent.',
+        emoji: '⚔️',
+    },
+];
+
+function getTrackingConfig(value, property = 'subcommand') {
+    return TRACKING_CHANNELS.find((config) => config[property] === value);
+}
+
+async function validateTrackingChannel(channel, client) {
+    const botPermissions = channel.permissionsFor(client.user);
+    return botPermissions?.has(['SendMessages', 'EmbedLinks']);
+}
+
+async function saveTrackingChannelConfig(client, guildId, configKey, channelId) {
+    const guildConfig = await getGuildConfig(client, guildId);
+    guildConfig[configKey] = channelId;
+    await client.db.set(getGuildConfigKey(guildId), guildConfig);
+    return guildConfig;
+}
+
 export default {
     data: new SlashCommandBuilder()
         .setName('economy-config')
-        .setDescription('Configure economy & funds tracking settings')
+        .setDescription('Configure economy tracking settings')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .addSubcommand(sub =>
             sub
@@ -26,6 +105,30 @@ export default {
         )
         .addSubcommand(sub =>
             sub
+                .setName('set-trade-tracking')
+                .setDescription('Set the #trade-tracking channel')
+                .addChannelOption(opt =>
+                    opt
+                        .setName('channel')
+                        .setDescription('The text channel for trade logs')
+                        .addChannelTypes(ChannelType.GuildText)
+                        .setRequired(true)
+                )
+        )
+        .addSubcommand(sub =>
+            sub
+                .setName('set-fight-tracking')
+                .setDescription('Set the #fight-tracking channel')
+                .addChannelOption(opt =>
+                    opt
+                        .setName('channel')
+                        .setDescription('The text channel for fight logs')
+                        .addChannelTypes(ChannelType.GuildText)
+                        .setRequired(true)
+                )
+        )
+        .addSubcommand(sub =>
+            sub
                 .setName('dashboard')
                 .setDescription('View and manage economy configuration')
         ),
@@ -33,37 +136,34 @@ export default {
     execute: withErrorHandling(async (interaction, config, client) => {
         const subcommand = interaction.options.getSubcommand();
         const guildId = interaction.guildId;
+        const trackingConfig = getTrackingConfig(subcommand);
 
-        if (subcommand === 'set-funds-tracking') {
+        if (trackingConfig) {
             const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
             if (!deferred) return;
 
             const channel = interaction.options.getChannel('channel', true);
-            const guildConfig = await getGuildConfig(client, guildId);
-
-            // Check bot permissions
-            const botPermissions = channel.permissionsFor(client.user);
-            if (!botPermissions.has(['SendMessages', 'EmbedLinks'])) {
+            const hasPermissions = await validateTrackingChannel(channel, client);
+            if (!hasPermissions) {
                 await InteractionHelper.safeEditReply(interaction, {
                     embeds: [errorEmbed('Bot Permissions Error', 'I need SendMessages and EmbedLinks permissions in that channel to send logs.')],
                 });
                 return;
             }
 
-            // Update config
-            guildConfig.fundsTrackingChannelId = channel.id;
-            await client.db.set(getGuildConfigKey(guildId), guildConfig);
+            await saveTrackingChannelConfig(client, guildId, trackingConfig.key, channel.id);
 
-            logger.info('[ECONOMY_CONFIG] Funds tracking channel set', {
+            logger.info('[ECONOMY_CONFIG] Tracking channel set', {
                 guildId,
+                configKey: trackingConfig.key,
                 channelId: channel.id,
                 userId: interaction.user.id,
             });
 
             await InteractionHelper.safeEditReply(interaction, {
                 embeds: [successEmbed(
-                    '💰 Funds Tracking Configured',
-                    `Funds tracking logs will be sent to ${channel}.\n\nWhen admins use \`/add balance\` or \`/remove balance\`, a detailed transaction log will appear in that channel.\n\n**Visibility:** Only Admins, Server Owner, and Support role can see these logs.`
+                    trackingConfig.successTitle,
+                    trackingConfig.successMessage(channel)
                 )],
             });
         } else if (subcommand === 'dashboard') {
@@ -73,44 +173,43 @@ export default {
             const guildConfig = await getGuildConfig(client, guildId);
             const guild = interaction.guild;
 
-            const fundsChannelText = guildConfig.fundsTrackingChannelId
-                ? `<#${guildConfig.fundsTrackingChannelId}>`
-                : '`Not set`';
-
             const embed = createEmbed({
                 title: '💰 Economy Configuration',
                 description: `Economy settings for **${guild.name}**`,
                 color: 'info',
-                fields: [
-                    {
-                        name: '📊 Funds Tracking Channel',
-                        value: fundsChannelText,
-                        inline: true,
-                    },
-                    {
-                        name: 'Status',
-                        value: guildConfig.fundsTrackingChannelId ? '✅ Configured' : '⚠️ Not configured',
-                        inline: true,
-                    },
-                ],
+                fields: TRACKING_CHANNELS.flatMap((entry) => {
+                    const channelId = guildConfig[entry.key];
+                    return [
+                        {
+                            name: entry.fieldName,
+                            value: channelId ? `<#${channelId}>` : '`Not set`',
+                            inline: true,
+                        },
+                        {
+                            name: 'Status',
+                            value: channelId ? '✅ Configured' : '⚠️ Not configured',
+                            inline: true,
+                        },
+                    ];
+                }),
             });
 
             const selectRow = new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
                     .setCustomId(`economy_config_select_${guildId}`)
                     .setPlaceholder('Select an option...')
-                    .addOptions(
+                    .addOptions(...TRACKING_CHANNELS.flatMap((entry) => [
                         new StringSelectMenuOptionBuilder()
-                            .setLabel('Set Funds Tracking Channel')
-                            .setDescription('Configure where transaction logs are sent')
-                            .setValue('set_funds_channel')
-                            .setEmoji('💰'),
+                            .setLabel(entry.selectLabel)
+                            .setDescription(entry.selectDescription)
+                            .setValue(entry.setValue)
+                            .setEmoji(entry.emoji),
                         new StringSelectMenuOptionBuilder()
-                            .setLabel('Clear Funds Tracking Channel')
-                            .setDescription('Disable funds tracking logs')
-                            .setValue('clear_funds_channel')
-                            .setEmoji('❌')
-                    )
+                            .setLabel(entry.clearLabel)
+                            .setDescription(entry.clearDescription)
+                            .setValue(entry.clearValue)
+                            .setEmoji('❌'),
+                    ]))
             );
 
             await InteractionHelper.safeEditReply(interaction, {
@@ -128,9 +227,15 @@ export default {
             collector.on('collect', async selectInteraction => {
                 await selectInteraction.deferUpdate();
 
-                if (selectInteraction.values[0] === 'set_funds_channel') {
+                const selectedValue = selectInteraction.values[0];
+                const selectedConfig = getTrackingConfig(selectedValue, 'setValue') || getTrackingConfig(selectedValue, 'clearValue');
+                if (!selectedConfig) {
+                    return;
+                }
+
+                if (selectedValue === selectedConfig.setValue) {
                     const channelSelect = new ChannelSelectMenuBuilder()
-                        .setCustomId(`economy_funds_channel_${guildId}`)
+                        .setCustomId(`${selectedConfig.selectorId}_${guildId}`)
                         .setPlaceholder('Select a text channel...')
                         .addChannelTypes(ChannelType.GuildText)
                         .setMaxValues(1);
@@ -138,8 +243,8 @@ export default {
                     await selectInteraction.followUp({
                         embeds: [
                             new EmbedBuilder()
-                                .setTitle('💰 Select Funds Tracking Channel')
-                                .setDescription('Choose where balance transaction logs will be sent.')
+                                .setTitle(selectedConfig.selectPromptTitle)
+                                .setDescription(selectedConfig.selectPromptDescription)
                                 .setColor(getColor('info')),
                         ],
                         components: [new ActionRowBuilder().addComponents(channelSelect)],
@@ -148,7 +253,7 @@ export default {
 
                     const channelCollector = selectInteraction.channel.createMessageComponentCollector({
                         componentType: ComponentType.ChannelSelect,
-                        filter: i => i.user.id === interaction.user.id && i.customId === `economy_funds_channel_${guildId}`,
+                        filter: i => i.user.id === interaction.user.id && i.customId === `${selectedConfig.selectorId}_${guildId}`,
                         time: 60_000,
                         max: 1,
                     });
@@ -156,30 +261,38 @@ export default {
                     channelCollector.on('collect', async channelInteraction => {
                         await channelInteraction.deferUpdate();
                         const selectedChannel = channelInteraction.channels.first();
+                        const hasPermissions = await validateTrackingChannel(selectedChannel, client);
+                        if (!hasPermissions) {
+                            await channelInteraction.followUp({
+                                embeds: [errorEmbed('Bot Permissions Error', 'I need SendMessages and EmbedLinks permissions in that channel to send logs.')],
+                                ephemeral: true,
+                            });
+                            return;
+                        }
 
-                        const updatedConfig = await getGuildConfig(client, guildId);
-                        updatedConfig.fundsTrackingChannelId = selectedChannel.id;
-                        await client.db.set(getGuildConfigKey(guildId), updatedConfig);
+                        await saveTrackingChannelConfig(client, guildId, selectedConfig.key, selectedChannel.id);
 
-                        logger.info('[ECONOMY_CONFIG] Funds tracking channel updated', {
+                        logger.info('[ECONOMY_CONFIG] Tracking channel updated', {
                             guildId,
+                            configKey: selectedConfig.key,
                             channelId: selectedChannel.id,
                         });
 
                         await channelInteraction.followUp({
-                            embeds: [successEmbed('💰 Funds Tracking Set', `Logs will be sent to ${selectedChannel}`)],
+                            embeds: [successEmbed(selectedConfig.setConfirmationTitle, `Logs will be sent to ${selectedChannel}`)],
                             ephemeral: true,
                         });
                     });
-                } else if (selectInteraction.values[0] === 'clear_funds_channel') {
-                    const updatedConfig = await getGuildConfig(client, guildId);
-                    updatedConfig.fundsTrackingChannelId = null;
-                    await client.db.set(getGuildConfigKey(guildId), updatedConfig);
+                } else if (selectedValue === selectedConfig.clearValue) {
+                    await saveTrackingChannelConfig(client, guildId, selectedConfig.key, null);
 
-                    logger.info('[ECONOMY_CONFIG] Funds tracking channel cleared', { guildId });
+                    logger.info('[ECONOMY_CONFIG] Tracking channel cleared', {
+                        guildId,
+                        configKey: selectedConfig.key,
+                    });
 
                     await selectInteraction.followUp({
-                        embeds: [successEmbed('💰 Funds Tracking Disabled', 'Transaction logs will no longer be sent.')],
+                        embeds: [successEmbed(selectedConfig.clearConfirmationTitle, selectedConfig.clearConfirmationMessage)],
                         ephemeral: true,
                     });
                 }

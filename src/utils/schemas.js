@@ -71,6 +71,8 @@ export const GuildConfigSchema = z
     birthdayChannelId: z.string().nullable().optional(),
     premiumRoleId: z.string().nullable().optional(),
     fundsTrackingChannelId: z.string().nullable().optional(),
+    tradeTrackingChannelId: z.string().nullable().optional(),
+    fightTrackingChannelId: z.string().nullable().optional(),
     logIgnore: LogIgnoreSchema.optional(),
     disabledCommands: z.record(z.boolean()).optional(),
     disabledCategories: z.record(z.boolean()).optional(),
