@@ -16,7 +16,6 @@ const PUBLIC_COMMANDS = new Set([
     'accept-fight',
     'decline-fight',
     'fight-status',
-    'fight-results',
     'link-osrs',
     'unlink-osrs',
     'trade',

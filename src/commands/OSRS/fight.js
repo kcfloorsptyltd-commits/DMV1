@@ -4,6 +4,7 @@ import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { parseHumanAmount } from '../../utils/economy.js';
 import { handleFightChallenge, saveFightMessage } from '../../services/osrsStakingService.js';
+import { logFightStage } from '../../utils/activityTracking.js';
 import { createFightActionRow, createFightChallengeEmbed } from '../../utils/osrsStakingPresentation.js';
 
 export default {
@@ -52,6 +53,8 @@ export default {
             if (reply?.id) {
                 await saveFightMessage(client, fight.id, reply.channelId, reply.id);
             }
+
+            await logFightStage(client, fight, 'challenged');
         } catch (error) {
             await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed(error.message)] });
         }

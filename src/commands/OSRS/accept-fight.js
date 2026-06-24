@@ -3,7 +3,8 @@ import { errorEmbed } from '../../utils/embeds.js';
 import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { handleFightAccept } from '../../services/osrsStakingService.js';
-import { createFightActiveEmbed } from '../../utils/osrsStakingPresentation.js';
+import { logFightStage } from '../../utils/activityTracking.js';
+import { createFightActiveEmbed, createFightResultConfirmationRow } from '../../utils/osrsStakingPresentation.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -28,7 +29,12 @@ export default {
                 interaction.user.id,
             );
 
-            await InteractionHelper.safeEditReply(interaction, { embeds: [createFightActiveEmbed(fight)] });
+            await InteractionHelper.safeEditReply(interaction, {
+                embeds: [createFightActiveEmbed(fight)],
+                components: [createFightResultConfirmationRow(fight.id)],
+            });
+
+            await logFightStage(client, fight, 'accepted');
         } catch (error) {
             await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed(error.message)] });
         }

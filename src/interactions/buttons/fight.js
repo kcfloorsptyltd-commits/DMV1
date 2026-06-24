@@ -1,10 +1,12 @@
 import { errorEmbed } from '../../utils/embeds.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { handleFightAccept, handleFightDecline } from '../../services/osrsStakingService.js';
+import { logFightStage } from '../../utils/activityTracking.js';
 import {
     createFightActionRow,
     createFightActiveEmbed,
     createFightCancelledEmbed,
+    createFightResultConfirmationRow,
 } from '../../utils/osrsStakingPresentation.js';
 
 export default {
@@ -17,8 +19,9 @@ export default {
                 const fight = await handleFightAccept(client, interaction.guildId, fightId, interaction.user.id);
                 await interaction.update({
                     embeds: [createFightActiveEmbed(fight)],
-                    components: [createFightActionRow(fight.id, true)],
+                    components: [createFightResultConfirmationRow(fight.id)],
                 });
+                await logFightStage(client, fight, 'accepted');
                 return;
             }
 
