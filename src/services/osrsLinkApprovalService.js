@@ -4,7 +4,6 @@ import {
     declinePendingOsrsLink,
     approvePendingOsrsRemoval,
     declinePendingOsrsRemoval,
-    getOsrsLink,
     getPendingOsrsRemoval,
 } from '../utils/database/osrs.js';
 
@@ -18,44 +17,49 @@ async function notifyUser(client, userId, content) {
     }
 }
 
-export async function handleOsrsLinkApproval(client, guildId, userId, approvedBy) {
-    const updated = await approvePendingOsrsLink(client, guildId, userId, approvedBy);
+export async function handleOsrsLinkApproval(client, guildId, userId, osrsUsername, approvedBy) {
+    const updated = await approvePendingOsrsLink(client, guildId, userId, osrsUsername, approvedBy);
 
-    const ticketId = updated.ticketId;
+    const ticketId = updated.osrsUsernames?.find(
+        (e) => e.username?.toLowerCase() === osrsUsername.toLowerCase(),
+    )?.ticketId;
+
     await notifyUser(
         client,
         userId,
-        `✅ Your OSRS username **${updated.osrsUsername}** has been approved and linked to your account!${ticketId ? ` (Ticket <#${ticketId}>)` : ''}`,
+        `✅ Your OSRS username **${osrsUsername}** has been approved and linked to your account!${ticketId ? ` (Ticket <#${ticketId}>)` : ''}`,
     );
 
-    logger.info('[OSRS_APPROVAL] Link approved', { guildId, userId, osrsUsername: updated.osrsUsername, approvedBy });
-    return updated;
+    logger.info('[OSRS_APPROVAL] Link approved', { guildId, userId, osrsUsername, approvedBy });
+    return { ...updated, osrsUsername };
 }
 
-export async function handleOsrsLinkDecline(client, guildId, userId, declinedBy, reason = null) {
-    const updated = await declinePendingOsrsLink(client, guildId, userId, declinedBy, reason);
+export async function handleOsrsLinkDecline(client, guildId, userId, osrsUsername, declinedBy, reason = null) {
+    const updated = await declinePendingOsrsLink(client, guildId, userId, osrsUsername, declinedBy, reason);
 
-    const ticketId = updated.ticketId;
+    const ticketId = updated.osrsUsernames?.find(
+        (e) => e.username?.toLowerCase() === osrsUsername.toLowerCase(),
+    )?.ticketId;
+
     await notifyUser(
         client,
         userId,
-        `❌ Your OSRS username link request for **${updated.osrsUsername}** was declined.${reason ? ` Reason: ${reason}` : ''}${ticketId ? ` (Ticket <#${ticketId}>)` : ''}`,
+        `❌ Your OSRS username link request for **${osrsUsername}** was declined.${reason ? ` Reason: ${reason}` : ''}${ticketId ? ` (Ticket <#${ticketId}>)` : ''}`,
     );
 
-    logger.info('[OSRS_APPROVAL] Link declined', { guildId, userId, osrsUsername: updated.osrsUsername, declinedBy });
-    return updated;
+    logger.info('[OSRS_APPROVAL] Link declined', { guildId, userId, osrsUsername, declinedBy });
+    return { ...updated, osrsUsername };
 }
 
-export async function handleOsrsRemovalApproval(client, guildId, userId, approvedBy) {
-    const removalRecord = await getPendingOsrsRemoval(client, guildId, userId);
+export async function handleOsrsRemovalApproval(client, guildId, userId, osrsUsername, approvedBy) {
+    const removalRecord = await getPendingOsrsRemoval(client, guildId, userId, osrsUsername);
     if (!removalRecord) {
-        throw new Error('No pending removal request found for this user.');
+        throw new Error(`No pending removal request found for **${osrsUsername}**.`);
     }
 
-    const osrsUsername = removalRecord.osrsUsername;
     const ticketId = removalRecord.ticketId;
 
-    const updated = await approvePendingOsrsRemoval(client, guildId, userId, approvedBy);
+    const updated = await approvePendingOsrsRemoval(client, guildId, userId, osrsUsername, approvedBy);
 
     await notifyUser(
         client,
@@ -64,19 +68,18 @@ export async function handleOsrsRemovalApproval(client, guildId, userId, approve
     );
 
     logger.info('[OSRS_APPROVAL] Removal approved', { guildId, userId, osrsUsername, approvedBy });
-    return updated;
+    return { ...updated, osrsUsername };
 }
 
-export async function handleOsrsRemovalDecline(client, guildId, userId, declinedBy, reason = null) {
-    const removalRecord = await getPendingOsrsRemoval(client, guildId, userId);
+export async function handleOsrsRemovalDecline(client, guildId, userId, osrsUsername, declinedBy, reason = null) {
+    const removalRecord = await getPendingOsrsRemoval(client, guildId, userId, osrsUsername);
     if (!removalRecord) {
-        throw new Error('No pending removal request found for this user.');
+        throw new Error(`No pending removal request found for **${osrsUsername}**.`);
     }
 
-    const osrsUsername = removalRecord.osrsUsername;
     const ticketId = removalRecord.ticketId;
 
-    const updated = await declinePendingOsrsRemoval(client, guildId, userId, declinedBy, reason);
+    const updated = await declinePendingOsrsRemoval(client, guildId, userId, osrsUsername, declinedBy, reason);
 
     await notifyUser(
         client,
@@ -85,5 +88,6 @@ export async function handleOsrsRemovalDecline(client, guildId, userId, declined
     );
 
     logger.info('[OSRS_APPROVAL] Removal declined', { guildId, userId, osrsUsername, declinedBy });
-    return updated;
+    return { ...updated, osrsUsername };
 }
+

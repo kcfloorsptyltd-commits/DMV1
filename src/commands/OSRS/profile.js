@@ -62,9 +62,35 @@ export default {
         const member = interaction.member;
 
         const rawLinks = await client.db.get(getOsrsLinkKey(guildId, targetUser.id), null);
-        const linkStatus = rawLinks?.status;
-        const isLinked = !linkStatus || linkStatus === OSRS_LINK_STATUSES.LINKED;
-        const linkedUsernames = isLinked ? normalizeLinkedOsrsUsernames(rawLinks) : [];
+
+        // Support both new array format and legacy single-username format
+        let linkedUsernames = [];
+        let pendingUsernames = [];
+        let declinedUsernames = [];
+
+        if (rawLinks && Array.isArray(rawLinks.osrsUsernames)) {
+            // New multi-RSN format
+            for (const entry of rawLinks.osrsUsernames) {
+                if (!entry.status || entry.status === OSRS_LINK_STATUSES.LINKED) {
+                    linkedUsernames.push(entry.username);
+                } else if (entry.status === OSRS_LINK_STATUSES.PENDING) {
+                    pendingUsernames.push(entry.username);
+                } else if (entry.status === OSRS_LINK_STATUSES.DECLINED) {
+                    declinedUsernames.push(entry.username);
+                }
+            }
+        } else if (rawLinks) {
+            // Legacy single-username format
+            const status = rawLinks?.status;
+            const isLinked = !status || status === OSRS_LINK_STATUSES.LINKED;
+            if (isLinked) {
+                linkedUsernames = normalizeLinkedOsrsUsernames(rawLinks);
+            } else if (status === OSRS_LINK_STATUSES.PENDING) {
+                pendingUsernames = rawLinks.osrsUsername ? [rawLinks.osrsUsername] : [];
+            } else if (status === OSRS_LINK_STATUSES.DECLINED) {
+                declinedUsernames = rawLinks.osrsUsername ? [rawLinks.osrsUsername] : [];
+            }
+        }
 
         const economyData = await getEconomyData(client, guildId, targetUser.id);
         const recentEvents = await getRecentPvpEvents(guildId);
@@ -82,17 +108,20 @@ export default {
         const userDisplayName = targetUser.username || targetUser.globalName || 'Unknown User';
 
         let linkedRsnsValue = buildLinkedRsnsValue(linkedUsernames);
-        if (!isLinked && rawLinks) {
-            if (linkStatus === OSRS_LINK_STATUSES.PENDING) {
-                linkedRsnsValue = `🟡 ${rawLinks.osrsUsername} — Pending approval`;
-            } else if (linkStatus === OSRS_LINK_STATUSES.DECLINED) {
-                linkedRsnsValue = `❌ ${rawLinks.osrsUsername} — Declined`;
+        if (pendingUsernames.length > 0 || declinedUsernames.length > 0) {
+            const statusLines = [];
+            for (const u of pendingUsernames) statusLines.push(`🟡 ${u} — Pending approval`);
+            for (const u of declinedUsernames) statusLines.push(`❌ ${u} — Declined`);
+            if (linkedUsernames.length > 0) {
+                linkedRsnsValue = `${buildLinkedRsnsValue(linkedUsernames)}\n${statusLines.join('\n')}`;
+            } else {
+                linkedRsnsValue = statusLines.join('\n');
             }
         }
 
         const embed = createEmbed({
             title: `${userDisplayName}'s OSRS Profile`,
-            description: linkedUsernames.length === 0 && isLinked
+            description: linkedUsernames.length === 0 && pendingUsernames.length === 0
                 ? '⚠️ No approved linked OSRS accounts found yet. Use /link-osrs to request linking.'
                 : 'Comprehensive staking profile overview.',
             color: 'primary',
@@ -148,6 +177,7 @@ export default {
             targetUserId: targetUser.id,
             requestedBy: interaction.user.id,
             linkedAccounts: linkedUsernames.length,
+            pendingAccounts: pendingUsernames.length,
             fightsShown: recentActivityRows.length,
         });
 

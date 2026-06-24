@@ -130,27 +130,27 @@ export function createFightDisputeResolutionRow(fightId, disabled = false) {
     );
 }
 
-export function createLinkApprovalRow(userId) {
+export function createLinkApprovalRow(userId, osrsUsername) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`osrs_link:approve:${userId}`)
+            .setCustomId(`osrs_link:approve:${userId}:${osrsUsername}`)
             .setLabel('✅ Approve')
             .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
-            .setCustomId(`osrs_link:decline:${userId}`)
+            .setCustomId(`osrs_link:decline:${userId}:${osrsUsername}`)
             .setLabel('❌ Decline')
             .setStyle(ButtonStyle.Danger),
     );
 }
 
-export function createRemovalApprovalRow(userId) {
+export function createRemovalApprovalRow(userId, osrsUsername) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`osrs_removal:approve:${userId}`)
+            .setCustomId(`osrs_removal:approve:${userId}:${osrsUsername}`)
             .setLabel('✅ Approve Removal')
             .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
-            .setCustomId(`osrs_removal:decline:${userId}`)
+            .setCustomId(`osrs_removal:decline:${userId}:${osrsUsername}`)
             .setLabel('❌ Decline Removal')
             .setStyle(ButtonStyle.Danger),
     );

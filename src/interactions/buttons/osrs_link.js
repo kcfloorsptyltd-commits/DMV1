@@ -12,7 +12,9 @@ import { getOsrsAdminPermissionError, isAuthorizedOsrsAdmin } from '../../utils/
 export default {
     name: 'osrs_link',
     async execute(interaction, client, args) {
-        const [action, userId] = args;
+        // customId format: osrs_link:approve:{userId}:{osrsUsername}
+        const [action, userId, ...usernameParts] = args;
+        const osrsUsername = usernameParts.join(':');
 
         const deferSuccess = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
         if (!deferSuccess) return;
@@ -30,8 +32,13 @@ export default {
                 return;
             }
 
+            if (!osrsUsername) {
+                await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed('Invalid button: missing OSRS username.')] });
+                return;
+            }
+
             if (action === 'approve') {
-                const updated = await handleOsrsLinkApproval(client, interaction.guildId, userId, interaction.user.id);
+                const updated = await handleOsrsLinkApproval(client, interaction.guildId, userId, osrsUsername, interaction.user.id);
                 await InteractionHelper.safeEditReply(interaction, {
                     embeds: [createEmbed({
                         title: '✅ RSN Link Approved',
@@ -45,7 +52,7 @@ export default {
             }
 
             if (action === 'decline') {
-                const updated = await handleOsrsLinkDecline(client, interaction.guildId, userId, interaction.user.id);
+                const updated = await handleOsrsLinkDecline(client, interaction.guildId, userId, osrsUsername, interaction.user.id);
                 await InteractionHelper.safeEditReply(interaction, {
                     embeds: [createEmbed({
                         title: '❌ RSN Link Declined',

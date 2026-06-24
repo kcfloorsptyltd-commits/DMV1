@@ -23,6 +23,14 @@ function resolveUsernameCandidates(rawLinks) {
     }
 
     if (typeof rawLinks === 'object') {
+        // New multi-RSN format: osrsUsernames is an array of { username, status } entries
+        if (Array.isArray(rawLinks.osrsUsernames)) {
+            return rawLinks.osrsUsernames
+                .filter((e) => !e.status || e.status === 'linked')
+                .map((e) => (typeof e === 'string' ? e : e.username))
+                .filter(Boolean);
+        }
+
         if (typeof rawLinks.osrsUsername === 'string') {
             return [rawLinks.osrsUsername];
         }

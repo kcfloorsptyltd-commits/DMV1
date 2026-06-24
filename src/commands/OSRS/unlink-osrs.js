@@ -1,128 +1,69 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, MessageFlags } from 'discord.js';
 import { createEmbed, errorEmbed } from '../../utils/embeds.js';
 import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { getActiveUserFights } from '../../utils/database/fights.js';
-import { getApprovedOsrsLink, createPendingOsrsRemoval, updateOsrsRemovalTicketId } from '../../utils/database/osrs.js';
-import { createTicket } from '../../services/ticket.js';
-import { getGuildConfig } from '../../services/guildConfig.js';
-import { createRemovalApprovalEmbed, createRemovalApprovalRow } from '../../utils/osrsStakingPresentation.js';
+import { getAllLinkedUsernames } from '../../utils/database/osrs.js';
 import { logger } from '../../utils/logger.js';
 
-const AUTO_DELETE_DELAY = 10000; // 10 seconds
+const AUTO_DELETE_DELAY = 30000; // 30 seconds for the dropdown message
 
 export default {
     data: new SlashCommandBuilder()
         .setName('unlink-osrs')
-        .setDescription('Request to unlink your OSRS username from your Discord account')
-        .addStringOption((option) =>
-            option
-                .setName('reason')
-                .setDescription('Optional reason for removing your RSN')
-                .setRequired(false),
-        ),
+        .setDescription('Request to unlink one of your OSRS usernames from your Discord account'),
 
     execute: withErrorHandling(async (interaction, _config, client) => {
-        const deferred = await InteractionHelper.safeDefer(interaction);
+        const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
         if (!deferred) return;
 
-        const reason = interaction.options.getString('reason');
-
         try {
-            const [link, fights] = await Promise.all([
-                getApprovedOsrsLink(client, interaction.guildId, interaction.user.id),
-                getActiveUserFights(client, interaction.guildId, interaction.user.id),
-            ]);
+            const linkedUsernames = await getAllLinkedUsernames(client, interaction.guildId, interaction.user.id);
 
-            if (!link) {
+            if (linkedUsernames.length === 0) {
                 await InteractionHelper.safeEditReply(interaction, {
-                    embeds: [errorEmbed('You do not currently have an approved OSRS username linked.')],
+                    embeds: [errorEmbed('You do not currently have any approved OSRS usernames linked.')],
                 });
                 return;
             }
 
-            if (fights.length > 0) {
-                await InteractionHelper.safeEditReply(interaction, {
-                    embeds: [errorEmbed('You cannot remove this RSN while you have active fights. Settle your fights first.')],
-                });
-                return;
-            }
-
-            const removalRecord = await createPendingOsrsRemoval(
-                client,
-                interaction.guildId,
-                interaction.user.id,
-                reason,
-            );
-
-            const config = await getGuildConfig(client, interaction.guildId);
-            const categoryId = config.ticketCategoryId || null;
-
-            let ticketChannel = null;
-
-            try {
-                const ticketResult = await createTicket(
-                    interaction.guild,
-                    interaction.member,
-                    categoryId,
-                    `RSN Removal Request - ${removalRecord.osrsUsername}`,
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId(`osrs_unlink_select:${interaction.user.id}`)
+                .setPlaceholder('Select an OSRS username to unlink...')
+                .addOptions(
+                    linkedUsernames.map((username) =>
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel(username)
+                            .setValue(username)
+                            .setDescription(`Request removal of ${username}`),
+                    ),
                 );
 
-                if (ticketResult.success && ticketResult.channel) {
-                    ticketChannel = ticketResult.channel;
-
-                    await updateOsrsRemovalTicketId(
-                        client,
-                        interaction.guildId,
-                        interaction.user.id,
-                        ticketChannel.id,
-                    );
-
-                    const approvalEmbed = createRemovalApprovalEmbed(
-                        interaction.user.id,
-                        removalRecord.osrsUsername,
-                        removalRecord.requestedAt,
-                        reason,
-                    );
-                    const approvalRow = createRemovalApprovalRow(interaction.user.id);
-
-                    await ticketChannel.send({
-                        embeds: [approvalEmbed],
-                        components: [approvalRow],
-                    });
-                }
-            } catch (ticketError) {
-                logger.warn('[UNLINK_OSRS] Failed to create ticket for removal request', {
-                    userId: interaction.user.id,
-                    error: ticketError.message,
-                });
-            }
+            const row = new ActionRowBuilder().addComponents(selectMenu);
 
             await InteractionHelper.safeEditReply(interaction, {
                 embeds: [
                     createEmbed({
-                        title: '📋 RSN Removal Request Submitted',
-                        description: [
-                            `Your request to remove **${removalRecord.osrsUsername}** has been submitted for admin approval.`,
-                            ticketChannel
-                                ? `\n📩 A support ticket has been created: <#${ticketChannel.id}>\nYou will be notified when your request is reviewed.`
-                                : '\nYou will be notified when your request is reviewed.',
-                        ].join('\n'),
-                        color: 'info',
+                        title: '🔓 Unlink OSRS Username',
+                        description: 'Select the OSRS username you would like to unlink. A support ticket will be created for admin approval.',
+                        color: 'warning',
                         fields: [
-                            { name: 'OSRS Username', value: removalRecord.osrsUsername, inline: true },
-                            { name: 'Status', value: '🟡 Pending Approval', inline: true },
+                            {
+                                name: '⚠️ Note',
+                                value: 'You cannot unlink an RSN while you have active fights using that username.',
+                                inline: false,
+                            },
                         ],
                     }),
                 ],
+                components: [row],
             });
 
-            // Auto-delete after 10 seconds
+            // Auto-delete after 30 seconds if no selection is made
             setTimeout(async () => {
                 try {
-                    await interaction.deleteReply();
+                    await interaction.editReply({ components: [] });
                 } catch (error) {
-                    logger.debug('Could not auto-delete unlink-osrs message', { error: error.message });
+                    logger.debug('Could not remove unlink-osrs components', { error: error.message });
                 }
             }, AUTO_DELETE_DELAY);
         } catch (error) {
