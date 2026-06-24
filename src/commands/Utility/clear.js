@@ -9,17 +9,17 @@ export default {
         .setDescription('Clear all messages from a channel'),
 
     execute: withErrorHandling(async (interaction, _config, client) => {
+        // DEFER FIRST to acknowledge the interaction
+        const deferred = await InteractionHelper.safeDefer(interaction, false);
+        if (!deferred) return;
+
         // Check if user is the server owner
         if (interaction.user.id !== interaction.guild.ownerId) {
-            await InteractionHelper.safeReply(interaction, {
+            await InteractionHelper.safeEditReply(interaction, {
                 embeds: [errorEmbed('Only the server owner can use this command.')],
-                ephemeral: true,
             });
             return;
         }
-
-        const deferred = await InteractionHelper.safeDefer(interaction, false);
-        if (!deferred) return;
 
         const channel = interaction.channel;
 
