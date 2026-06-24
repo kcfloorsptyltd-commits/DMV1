@@ -168,21 +168,6 @@ export default {
                             embeds: [createFightResultWaitingEmbed(updatedFight, waitingForId)],
                             components: [createFightResultConfirmationRow(updatedFight.id)],
                         });
-
-                        // Send a follow-up to the OTHER fighter showing they're waiting
-                        try {
-                            const otherFighterId = isChallenger ? updatedFight.opponent_id : updatedFight.challenger_id;
-                            const otherFighter = await client.users.fetch(otherFighterId);
-                            if (otherFighter && interaction.channel) {
-                                await interaction.channel.send({
-                                    content: `<@${otherFighterId}>`,
-                                    embeds: [createFightResultWaitingEmbed(updatedFight, waitingForId)],
-                                    components: [createFightResultConfirmationRow(updatedFight.id)],
-                                });
-                            }
-                        } catch (error) {
-                            // Silently log if we can't notify the other fighter
-                        }
                         return;
                     }
 
