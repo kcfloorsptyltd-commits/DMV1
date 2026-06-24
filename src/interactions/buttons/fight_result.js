@@ -7,8 +7,19 @@ import {
     createFightResultConfirmationRow,
     createFightResultWaitingEmbed,
 } from '../../utils/osrsStakingPresentation.js';
+import { Mutex } from '../../utils/mutex.js';
 
 const RESULT_MESSAGE_TTL_MS = 30_000;
+
+// Mutex to prevent race conditions on fight result processing
+const fightMutexes = new Map();
+
+function getFightMutex(fightId) {
+    if (!fightMutexes.has(fightId)) {
+        fightMutexes.set(fightId, new Mutex());
+    }
+    return fightMutexes.get(fightId);
+}
 
 const FIGHT_RESULT_MESSAGES = {
     winner: '🎉 Congratulations you have won and the funds have been awarded to your balance',
@@ -104,6 +115,10 @@ export default {
 
             // Now do heavy work in background after defer is sent
             setImmediate(async () => {
+                // Acquire mutex lock for this fight to prevent race conditions
+                const mutex = getFightMutex(fightId);
+                const release = await mutex.lock();
+
                 try {
                     const currentFight = await getFight(client, fightId);
                     if (!currentFight) {
@@ -124,6 +139,11 @@ export default {
                     // Dispute can be raised at any time by either fighter
                     if (action === 'dispute') {
                         try {
+                            // Check if ticket already exists to prevent duplicate tickets
+                            if (currentFight.ticketId) {
+                                return; // Ticket already created, don't duplicate
+                            }
+
                             const ticketChannel = await createFightDisputeTicket(client, interaction.guild, interaction.member, currentFight);
                             if (ticketChannel) {
                                 currentFight.ticketId = ticketChannel.id;
@@ -174,6 +194,11 @@ export default {
                     // Both claim they won → dispute
                     if (challengerConfirmed === 'won' && opponentConfirmed === 'won') {
                         try {
+                            // Check if ticket already exists to prevent duplicate tickets
+                            if (updatedFight.ticketId) {
+                                return; // Ticket already created, don't duplicate
+                            }
+
                             const ticketChannel = await createFightDisputeTicket(client, interaction.guild, interaction.member, updatedFight);
                             if (ticketChannel) {
                                 updatedFight.ticketId = ticketChannel.id;
@@ -195,12 +220,18 @@ export default {
                         (challengerConfirmed === 'lost' && opponentConfirmed === 'won')
                     ) {
                         try {
+                            // Check if already paid out to prevent duplicate payouts
+                            if (updatedFight.winner_id) {
+                                return; // Already resolved, don't process again
+                            }
+
                             const winnerId = challengerConfirmed === 'won'
                                 ? updatedFight.challenger_id
                                 : updatedFight.opponent_id;
                             const loserId = winnerId === updatedFight.challenger_id
                                 ? updatedFight.opponent_id
                                 : updatedFight.challenger_id;
+                            
                             await payoutFightWinner(client, updatedFight.id, winnerId, { source: 'dual_confirmation' });
                             const resultMessages = await sendResultMessages(interaction, winnerId, loserId);
                             scheduleFightCleanup(interaction.message, resultMessages);
@@ -213,6 +244,11 @@ export default {
                     // Both claim they lost → refund both
                     if (challengerConfirmed === 'lost' && opponentConfirmed === 'lost') {
                         try {
+                            // Check if already refunded to prevent duplicate refunds
+                            if (updatedFight.fundsRefunded) {
+                                return; // Already refunded, don't process again
+                            }
+
                             await refundFight(client, updatedFight.id);
                             const loserMessages = await sendLoserMessages(interaction, [
                                 updatedFight.challenger_id,
@@ -226,6 +262,9 @@ export default {
                     }
                 } catch (error) {
                     // Background task error - silently log
+                } finally {
+                    // Always release the mutex lock
+                    release();
                 }
             });
         } catch (error) {
