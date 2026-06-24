@@ -79,10 +79,14 @@ async function sendDisputeMessage(interaction, fight) {
         return null;
     }
 
-    return interaction.channel.send({
-        content: `<@${fight.challenger_id}> <@${fight.opponent_id}> ${FIGHT_RESULT_MESSAGES.dispute}`,
-        allowedMentions: { users: [fight.challenger_id, fight.opponent_id] },
-    });
+    const [disputeMessage] = await sendTemporaryMessages([
+        interaction.channel.send({
+            content: `<@${fight.challenger_id}> <@${fight.opponent_id}> ${FIGHT_RESULT_MESSAGES.dispute}`,
+            allowedMentions: { users: [fight.challenger_id, fight.opponent_id] },
+        }),
+    ]);
+
+    return disputeMessage || null;
 }
 
 async function handleDisputeAction(interaction, client, fight) {
