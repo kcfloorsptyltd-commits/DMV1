@@ -39,6 +39,8 @@ export default {
 
             let deleted = 0;
             let lastMessage = null;
+            let lastUpdate = Date.now();
+            const UPDATE_INTERVAL = 30_000; // Update every 30 seconds
 
             // Fetch and delete messages in batches
             while (true) {
@@ -54,8 +56,23 @@ export default {
                 deleted += bulk.size;
                 lastMessage = messages.last();
 
+                // Update progress every 30 seconds to keep webhook alive
+                const now = Date.now();
+                if (now - lastUpdate >= UPDATE_INTERVAL) {
+                    await interaction.editReply({
+                        embeds: [
+                            createEmbed({
+                                title: '🔄 Clearing Channel...',
+                                description: `Deleted **${deleted}** messages so far from <#${channel.id}>.`,
+                                color: 'info',
+                            }),
+                        ],
+                    });
+                    lastUpdate = now;
+                }
+
                 // Small delay to avoid rate limiting
-                await new Promise((resolve) => setTimeout(resolve, 500));
+                await new Promise((resolve) => setTimeout(resolve, 100));
             }
 
             await interaction.editReply({
