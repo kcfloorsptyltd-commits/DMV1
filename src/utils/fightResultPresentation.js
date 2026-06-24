@@ -26,14 +26,18 @@ function timestamp(isoString) {
 }
 
 /**
- * Confirm-result button row — shown while waiting for the second confirmation.
+ * Result button row — I Won / I Lost / Dispute
  */
 export function createConfirmResultRow(fightId) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`fight_result:confirm:${fightId}`)
-            .setLabel('✅ Confirm Result')
+            .setCustomId(`fight_result:won:${fightId}`)
+            .setLabel('✅ I Won')
             .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId(`fight_result:lost:${fightId}`)
+            .setLabel('❌ I Lost')
+            .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`fight_result:dispute:${fightId}`)
             .setLabel('🚨 Dispute')
@@ -72,7 +76,7 @@ export function createWaitingForConfirmationEmbed(fight) {
                 ? [{ name: 'Reported Winner', value: reportedWinnerName, inline: false }]
                 : []),
         ],
-        footer: 'Click ✅ Confirm Result if you agree, or 🚨 Dispute to flag an issue',
+        footer: 'Click ✅ I Won or ❌ I Lost to confirm, or 🚨 Dispute to flag an issue',
     });
 }
 
