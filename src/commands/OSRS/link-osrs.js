@@ -8,6 +8,8 @@ import { getGuildConfig } from '../../services/guildConfig.js';
 import { createLinkApprovalEmbed, createLinkApprovalRow } from '../../utils/osrsStakingPresentation.js';
 import { logger } from '../../utils/logger.js';
 
+console.log('[DEBUG] link-osrs.js imports loaded successfully');
+
 export default {
     data: new SlashCommandBuilder()
         .setName('link-osrs')
