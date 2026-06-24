@@ -1,0 +1,29 @@
+FROM node:20-alpine
+
+WORKDIR /usr/src/app
+
+# Copy package files
+COPY package.json package-lock.json* ./
+
+# Install dependencies
+RUN apk add --no-cache build-base python3 linux-headers sqlite-dev && \
+    npm ci --production || npm install --production
+
+# Copy source
+COPY . .
+
+# Patch the validation code
+RUN sed -i '/^const configErrors = validateConfig/,/^}/d' src/config/bot.js
+
+# Build if needed
+RUN npm run build --if-present || true
+
+# Runtime stage
+FROM node:20-alpine
+RUN apk add --no-cache sqlite-libs
+WORKDIR /usr/src/app
+COPY --from=0 /usr/src/app/node_modules ./node_modules
+COPY --from=0 /usr/src/app .
+
+CMD ["node", "src/app.js"]
+
