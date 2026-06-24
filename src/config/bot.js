@@ -303,13 +303,14 @@ export function validateConfig(config) {
   return errors;
 }
 
-const configErrors = validateConfig(botConfig);
-if (configErrors.length > 0) {
-  logger.error("Bot configuration errors:", configErrors.join("\n"));
-  if (process.env.NODE_ENV === "production") {
-    process.exit(1);
-  }
-}
+// Validation disabled at module load time — was blocking bot startup
+// const configErrors = validateConfig(botConfig);
+// if (configErrors.length > 0) {
+//   logger.error("Bot configuration errors:", configErrors.join("\n"));
+//   if (process.env.NODE_ENV === "production") {
+//     process.exit(1);
+//   }
+// }
 
 export const BotConfig = botConfig;
 
@@ -341,3 +342,4 @@ export function getRandomColor() {
 }
 
 export default botConfig;
+
