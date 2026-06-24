@@ -5,10 +5,12 @@ import { logFightStage } from '../../utils/activityTracking.js';
 import { getFight } from '../../utils/database/fights.js';
 import {
     createFightActionRow,
-    createFightActiveEmbed,
     createFightCancelledEmbed,
-    createFightResultConfirmationRow,
 } from '../../utils/osrsStakingPresentation.js';
+import {
+    createWaitingForConfirmationEmbed,
+    createConfirmResultRow,
+} from '../../utils/fightResultPresentation.js';
 
 export default {
     name: 'fight',
@@ -35,8 +37,8 @@ export default {
             if (action === 'accept') {
                 const updatedFight = await handleFightAccept(client, interaction.guildId, fightId, interaction.user.id);
                 await interaction.update({
-                    embeds: [createFightActiveEmbed(updatedFight)],
-                    components: [createFightResultConfirmationRow(updatedFight.id)],
+                    embeds: [createWaitingForConfirmationEmbed(updatedFight)],
+                    components: [createConfirmResultRow(updatedFight.id)],
                 });
                 await logFightStage(client, updatedFight, 'accepted');
                 return;
