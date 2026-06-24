@@ -15,6 +15,14 @@ export {
 } from './database/wrapper.js';
 
 export {
+    verifyDataPersistence,
+    exportAllData,
+    getDataPersistenceStatus,
+    migrateKeyValueToPg,
+    logPersistenceSummary,
+} from './database/persistence.js';
+
+export {
     getGuildConfigKey,
     getGuildBirthdaysKey,
     getTicketKey,
