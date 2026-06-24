@@ -8,12 +8,85 @@ import {
     createFightResultWaitingEmbed,
 } from '../../utils/osrsStakingPresentation.js';
 
-async function deleteReplyMessage(interaction) {
+const RESULT_MESSAGE_TTL_MS = 30_000;
+
+const FIGHT_RESULT_MESSAGES = {
+    winner: '🎉 Congratulations you have won and the funds have been awarded to your balance',
+    loser: '😢 Oh nooo better luck next time!',
+    dispute: '⚠️ Oh noo a dispute has been made please come to the ticket',
+};
+
+async function deleteMessage(message) {
+    if (!message) return;
+
     try {
-        await interaction.deleteReply();
+        await message.delete();
     } catch {
-        // Message may already be deleted or interaction expired — silently ignore
+        // Message may already be deleted or inaccessible — silently ignore
     }
+}
+
+function scheduleFightCleanup(fightMessage, notificationMessages = []) {
+    setTimeout(async () => {
+        try {
+            await Promise.all(notificationMessages.map((message) => deleteMessage(message)));
+            await deleteMessage(fightMessage);
+        } catch {
+            // Cleanup failures are non-fatal and should not disrupt fight flow
+        }
+    }, RESULT_MESSAGE_TTL_MS);
+}
+
+async function sendTemporaryMessages(messagePromises) {
+    const results = await Promise.allSettled(messagePromises);
+    return results
+        .filter((result) => result.status === 'fulfilled' && result.value)
+        .map((result) => result.value);
+}
+
+async function sendResultMessages(interaction, winnerId, loserId) {
+    if (!interaction.channel?.send) {
+        return [];
+    }
+
+    return sendTemporaryMessages([
+        interaction.channel.send({
+            content: `<@${winnerId}> ${FIGHT_RESULT_MESSAGES.winner}`,
+            allowedMentions: { users: [winnerId] },
+        }),
+        interaction.channel.send({
+            content: `<@${loserId}> ${FIGHT_RESULT_MESSAGES.loser}`,
+            allowedMentions: { users: [loserId] },
+        }),
+    ]);
+}
+
+async function sendLoserMessages(interaction, fighterIds = []) {
+    if (!interaction.channel?.send) {
+        return [];
+    }
+
+    return sendTemporaryMessages(
+        fighterIds.map((fighterId) => interaction.channel.send({
+            content: `<@${fighterId}> ${FIGHT_RESULT_MESSAGES.loser}`,
+            allowedMentions: { users: [fighterId] },
+        })),
+    );
+}
+
+async function sendDisputeMessage(interaction, fight) {
+    if (!interaction.channel?.send) {
+        return null;
+    }
+
+    const [disputeMessage] = await sendTemporaryMessages([
+        interaction.channel.send({
+            content: `<@${fight.challenger_id}> <@${fight.opponent_id}> ${FIGHT_RESULT_MESSAGES.dispute}`,
+            allowedMentions: { users: [fight.challenger_id, fight.opponent_id] },
+        }),
+    ]);
+
+    return disputeMessage || null;
 }
 
 async function handleDisputeAction(interaction, client, fight) {
@@ -29,7 +102,8 @@ async function handleDisputeAction(interaction, client, fight) {
         }
 
         await logFightStage(client, fight, 'ticket_created');
-        await deleteReplyMessage(interaction);
+        const disputeMessage = await sendDisputeMessage(interaction, fight);
+        scheduleFightCleanup(interaction.message, [disputeMessage].filter(Boolean));
     } catch (error) {
         await interaction.editReply({ embeds: [errorEmbed(error.message)] });
     }
@@ -112,8 +186,12 @@ export default {
                     const winnerId = challengerConfirmed === 'won'
                         ? currentFight.challenger_id
                         : currentFight.opponent_id;
+                    const loserId = winnerId === currentFight.challenger_id
+                        ? currentFight.opponent_id
+                        : currentFight.challenger_id;
                     await payoutFightWinner(client, currentFight.id, winnerId, { source: 'dual_confirmation' });
-                    await deleteReplyMessage(interaction);
+                    const resultMessages = await sendResultMessages(interaction, winnerId, loserId);
+                    scheduleFightCleanup(interaction.message, resultMessages);
                 } catch (payoutError) {
                     await interaction.editReply({ embeds: [errorEmbed(payoutError.message)] });
                 }
@@ -125,7 +203,11 @@ export default {
                 await interaction.deferUpdate();
                 try {
                     await refundFight(client, currentFight.id);
-                    await deleteReplyMessage(interaction);
+                    const loserMessages = await sendLoserMessages(interaction, [
+                        currentFight.challenger_id,
+                        currentFight.opponent_id,
+                    ]);
+                    scheduleFightCleanup(interaction.message, loserMessages);
                 } catch (refundError) {
                     await interaction.editReply({ embeds: [errorEmbed(refundError.message)] });
                 }
