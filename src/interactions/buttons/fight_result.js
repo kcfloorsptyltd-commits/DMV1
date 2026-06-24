@@ -155,24 +155,26 @@ export default {
             await saveFight(client, currentFight);
             await logFightStage(client, currentFight, 'result_submitted');
 
-            const challengerConfirmed = currentFight.challengerConfirmed;
-            const opponentConfirmed = currentFight.opponentConfirmed;
+            // Reload fight from database to get updated state from both fighters
+            const updatedFight = await getFight(client, fightId);
+            const challengerConfirmed = updatedFight.challengerConfirmed;
+            const opponentConfirmed = updatedFight.opponentConfirmed;
 
             // Still waiting for the other fighter
             if (challengerConfirmed === null || opponentConfirmed === null) {
                 const waitingForId = challengerConfirmed === null
-                    ? currentFight.challenger_id
-                    : currentFight.opponent_id;
+                    ? updatedFight.challenger_id
+                    : updatedFight.opponent_id;
                 await interaction.update({
-                    embeds: [createFightResultWaitingEmbed(currentFight, waitingForId)],
-                    components: [createFightResultConfirmationRow(currentFight.id)],
+                    embeds: [createFightResultWaitingEmbed(updatedFight, waitingForId)],
+                    components: [createFightResultConfirmationRow(updatedFight.id)],
                 });
                 return;
             }
 
             // Both claim they won → dispute
             if (challengerConfirmed === 'won' && opponentConfirmed === 'won') {
-                await handleDisputeAction(interaction, client, currentFight);
+                await handleDisputeAction(interaction, client, updatedFight);
                 return;
             }
 
@@ -184,12 +186,12 @@ export default {
                 await interaction.deferUpdate();
                 try {
                     const winnerId = challengerConfirmed === 'won'
-                        ? currentFight.challenger_id
-                        : currentFight.opponent_id;
-                    const loserId = winnerId === currentFight.challenger_id
-                        ? currentFight.opponent_id
-                        : currentFight.challenger_id;
-                    await payoutFightWinner(client, currentFight.id, winnerId, { source: 'dual_confirmation' });
+                        ? updatedFight.challenger_id
+                        : updatedFight.opponent_id;
+                    const loserId = winnerId === updatedFight.challenger_id
+                        ? updatedFight.opponent_id
+                        : updatedFight.challenger_id;
+                    await payoutFightWinner(client, updatedFight.id, winnerId, { source: 'dual_confirmation' });
                     const resultMessages = await sendResultMessages(interaction, winnerId, loserId);
                     scheduleFightCleanup(interaction.message, resultMessages);
                 } catch (payoutError) {
@@ -202,10 +204,10 @@ export default {
             if (challengerConfirmed === 'lost' && opponentConfirmed === 'lost') {
                 await interaction.deferUpdate();
                 try {
-                    await refundFight(client, currentFight.id);
+                    await refundFight(client, updatedFight.id);
                     const loserMessages = await sendLoserMessages(interaction, [
-                        currentFight.challenger_id,
-                        currentFight.opponent_id,
+                        updatedFight.challenger_id,
+                        updatedFight.opponent_id,
                     ]);
                     scheduleFightCleanup(interaction.message, loserMessages);
                 } catch (refundError) {
