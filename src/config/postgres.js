@@ -18,6 +18,8 @@ const configuredTables = {
     verification_audit: 'verification_audit',
     temp_data: 'temp_data',
     cache_data: 'cache_data',
+    pvp_stats: 'pvp_stats',
+    pvp_recent: 'pvp_recent',
 };
 
 const allowedTableIdentifiers = new Set([
@@ -37,6 +39,8 @@ const allowedTableIdentifiers = new Set([
     'verification_audit',
     'temp_data',
     'cache_data',
+    'pvp_stats',
+    'pvp_recent',
 ]);
 
 const validatedTables = Object.fromEntries(

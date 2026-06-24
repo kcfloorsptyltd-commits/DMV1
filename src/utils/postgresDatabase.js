@@ -398,13 +398,7 @@ class PostgreSQLDatabase {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )`,
             
-            `CREATE TABLE IF NOT EXISTS ${pgConfig.tables.cache_data} (
-                key VARCHAR(255) PRIMARY KEY,
-                value JSONB NOT NULL,
-                expires_at TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )`
-        ];
+            `CREATE TABLE IF NOT EXISTS ${pgConfig.tables.cache_data} (\n                key VARCHAR(255) PRIMARY KEY,\n                value JSONB NOT NULL,\n                expires_at TIMESTAMP,\n                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n            )`,\n\n            `CREATE TABLE IF NOT EXISTS ${pgConfig.tables.pvp_stats} (\n                guild_id VARCHAR(20),\n                player_name VARCHAR(100),\n                kills INTEGER DEFAULT 0,\n                deaths INTEGER DEFAULT 0,\n                last_kill TIMESTAMP,\n                last_death TIMESTAMP,\n                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n                PRIMARY KEY (guild_id, player_name),\n                FOREIGN KEY (guild_id) REFERENCES ${pgConfig.tables.guilds}(id) ON DELETE CASCADE\n            )`,\n\n            `CREATE TABLE IF NOT EXISTS ${pgConfig.tables.pvp_recent} (\n                id SERIAL PRIMARY KEY,\n                guild_id VARCHAR(20) NOT NULL,\n                killer_name VARCHAR(100) NOT NULL,\n                victim_name VARCHAR(100) NOT NULL,\n                timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n                FOREIGN KEY (guild_id) REFERENCES ${pgConfig.tables.guilds}(id) ON DELETE CASCADE\n            )`\n        ];\n
 
         for (const table of tables) {
             try {
@@ -439,7 +433,10 @@ class PostgreSQLDatabase {
             `CREATE INDEX IF NOT EXISTS idx_verification_audit_user_id ON ${pgConfig.tables.verification_audit}(user_id)`,
             `CREATE INDEX IF NOT EXISTS idx_verification_audit_created_at ON ${pgConfig.tables.verification_audit}(created_at)`,
             `CREATE INDEX IF NOT EXISTS idx_temp_data_expires_at ON ${pgConfig.tables.temp_data}(expires_at)`,
-            `CREATE INDEX IF NOT EXISTS idx_cache_data_expires_at ON ${pgConfig.tables.cache_data}(expires_at)`
+            `CREATE INDEX IF NOT EXISTS idx_cache_data_expires_at ON ${pgConfig.tables.cache_data}(expires_at)`,
+            `CREATE INDEX IF NOT EXISTS idx_pvp_stats_guild_id ON ${pgConfig.tables.pvp_stats}(guild_id)`,
+            `CREATE INDEX IF NOT EXISTS idx_pvp_stats_kills ON ${pgConfig.tables.pvp_stats}(guild_id, kills DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_pvp_recent_guild_timestamp ON ${pgConfig.tables.pvp_recent}(guild_id, timestamp DESC)`
         ];
 
         for (const index of indexes) {
@@ -481,6 +478,7 @@ class PostgreSQLDatabase {
                 { name: 'update_giveaways_updated_at', table: pgConfig.tables.giveaways },
                 { name: 'update_tickets_updated_at', table: pgConfig.tables.tickets },
                 { name: 'update_afk_status_updated_at', table: pgConfig.tables.afk_status },
+                { name: 'update_pvp_stats_updated_at', table: pgConfig.tables.pvp_stats },
             ];
 
             const allowedTriggerIdentifiers = new Set(triggers.map(trigger => trigger.name));
