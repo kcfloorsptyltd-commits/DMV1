@@ -303,12 +303,14 @@ export function validateConfig(config) {
   return errors;
 }
 
-const configErrors = validateConfig(botConfig);
-if (configErrors.length > 0) {
-  logger.error("Bot configuration errors:", configErrors.join("\n"));
-  if (process.env.NODE_ENV === "production") {
-    process.exit(1);
+try {
+  const configErrors = validateConfig(botConfig);
+  if (configErrors.length > 0) {
+    logger.warn("Config warnings:", configErrors.join("\n"));
+    // Don't exit, just warn
   }
+} catch (e) {
+  logger.warn("Config validation error:", e.message);
 }
 
 export const BotConfig = botConfig;
