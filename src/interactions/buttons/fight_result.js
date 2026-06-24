@@ -171,6 +171,12 @@ export default {
                         return;
                     }
 
+                    // PROTECTION: Check if already processed (status is not 'pending')
+                    if (updatedFight.status && updatedFight.status !== 'pending') {
+                        // Fight already resolved, don't process again
+                        return;
+                    }
+
                     // Both claim they won → dispute
                     if (challengerConfirmed === 'won' && opponentConfirmed === 'won') {
                         try {
@@ -201,6 +207,11 @@ export default {
                             const loserId = winnerId === updatedFight.challenger_id
                                 ? updatedFight.opponent_id
                                 : updatedFight.challenger_id;
+                            
+                            // Mark as resolved BEFORE processing to prevent race condition
+                            updatedFight.status = 'completed';
+                            await saveFight(client, updatedFight);
+                            
                             await payoutFightWinner(client, updatedFight.id, winnerId, { source: 'dual_confirmation' });
                             const resultMessages = await sendResultMessages(interaction, winnerId, loserId);
                             scheduleFightCleanup(interaction.message, resultMessages);
@@ -213,6 +224,10 @@ export default {
                     // Both claim they lost → refund both
                     if (challengerConfirmed === 'lost' && opponentConfirmed === 'lost') {
                         try {
+                            // Mark as resolved BEFORE processing to prevent race condition
+                            updatedFight.status = 'completed';
+                            await saveFight(client, updatedFight);
+                            
                             await refundFight(client, updatedFight.id);
                             const loserMessages = await sendLoserMessages(interaction, [
                                 updatedFight.challenger_id,
