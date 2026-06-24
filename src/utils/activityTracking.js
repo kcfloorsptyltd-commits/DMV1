@@ -3,8 +3,6 @@ import { getGuildConfig } from '../services/guildConfig.js';
 import { formatCurrency } from './economy.js';
 import { logger } from './logger.js';
 
-const FIGHT_TRACKING_EMOJI = '⚔️';
-
 async function getAndValidateTrackingChannel(client, guildId, channelConfigKey, logContext) {
     const config = await getGuildConfig(client, guildId);
 
@@ -162,7 +160,7 @@ export function createFightTrackingEmbed(fight) {
 
     return new EmbedBuilder()
         .setColor(0xCC6600)
-        .setTitle(`${FIGHT_TRACKING_EMOJI} Fight Resolved`)
+        .setTitle('⚔️ Fight Resolved')
         .addFields(
             {
                 name: 'Fighters',
