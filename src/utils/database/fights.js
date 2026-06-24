@@ -240,6 +240,7 @@ export async function refundFight(client, fightId, resolution = {}) {
     fight.challengerPayout = resolution.challengerPayout ?? fight.amount;
     fight.opponentPayout = resolution.opponentPayout ?? fight.amount;
     await saveFight(client, fight);
+    await logFightActivity(client, fight);
     return fight;
 }
 

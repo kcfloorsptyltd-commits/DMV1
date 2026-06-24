@@ -6,10 +6,12 @@ import { ChannelType, Collection } from 'discord.js';
 import economyConfigCommand from '../src/commands/Economy/economy-config.js';
 import { logFightActivity, logTradeActivity } from '../src/utils/activityTracking.js';
 import { getGuildConfigKey } from '../src/utils/database.js';
+import { createFight, payoutFightWinner, refundFight } from '../src/utils/database/fights.js';
 
 class FakeDb {
     constructor() {
         this.store = new Map();
+        this.counters = new Map();
     }
 
     async get(key, defaultValue = null) {
@@ -19,6 +21,16 @@ class FakeDb {
     async set(key, value) {
         this.store.set(key, value);
         return true;
+    }
+
+    async increment(key, amount = 1) {
+        const nextValue = (this.counters.get(key) || 0) + amount;
+        this.counters.set(key, nextValue);
+        return nextValue;
+    }
+
+    async list(prefix) {
+        return [...this.store.keys()].filter((key) => key.startsWith(prefix));
     }
 }
 
@@ -144,4 +156,57 @@ test('fight activity logs to the configured fight tracking channel and applies r
     assert.ok(overwriteTargets.includes('support-role'));
     assert.ok(overwriteTargets.includes('owner-1'));
     assert.ok(overwriteTargets.includes('bot-1'));
+});
+
+test('payoutFightWinner sends fight tracking after a successful payout', async () => {
+    const { guild, sends } = createGuildHarness('fight-chan');
+    const client = createClient(guild);
+    const guildId = 'guild-3';
+
+    await client.db.set(getGuildConfigKey(guildId), {
+        fightTrackingChannelId: 'fight-chan',
+    });
+
+    const fight = await createFight(client, guildId, 'fighter-3', 'fighter-4', 3_000_000, {
+        challengerOsrsUsername: 'Risky Three',
+        opponentOsrsUsername: 'Risky Four',
+    });
+
+    const resolvedFight = await payoutFightWinner(client, fight.id, 'fighter-3', {
+        source: 'test_resolution',
+    });
+
+    assert.equal(resolvedFight.winner_id, 'fighter-3');
+    assert.equal(sends.length, 1);
+
+    const embed = sends[0].embeds[0].toJSON();
+    assert.ok(embed.fields.some((field) => field.name === 'Winner' && field.value.includes('<@fighter-3>')));
+    assert.ok(embed.fields.some((field) => field.name === 'Resolution' && field.value === 'test_resolution'));
+});
+
+test('refundFight sends fight tracking after a successful refund', async () => {
+    const { guild, sends } = createGuildHarness('fight-chan');
+    const client = createClient(guild);
+    const guildId = 'guild-4';
+
+    await client.db.set(getGuildConfigKey(guildId), {
+        fightTrackingChannelId: 'fight-chan',
+    });
+
+    const fight = await createFight(client, guildId, 'fighter-5', 'fighter-6', 4_000_000, {
+        challengerOsrsUsername: 'Risky Five',
+        opponentOsrsUsername: 'Risky Six',
+    });
+
+    const refundedFight = await refundFight(client, fight.id, {
+        source: 'test_refund',
+    });
+
+    assert.equal(refundedFight.status, 'cancelled');
+    assert.equal(sends.length, 1);
+
+    const embed = sends[0].embeds[0].toJSON();
+    assert.ok(embed.fields.some((field) => field.name === 'Winner' && field.value === 'Refunded to both fighters'));
+    assert.ok(embed.fields.some((field) => field.name === 'Pot Paid' && field.value.includes('8m')));
+    assert.ok(embed.fields.some((field) => field.name === 'Resolution' && field.value === 'test_refund'));
 });

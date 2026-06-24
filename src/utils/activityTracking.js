@@ -157,6 +157,8 @@ export async function logTradeActivity(client, guildId, data) {
 
 export function createFightTrackingEmbed(fight) {
     const timestamp = fight?.resolved_at ? new Date(fight.resolved_at) : new Date();
+    const winnerValue = fight?.winner_id ? `<@${fight.winner_id}>` : 'Refunded to both fighters';
+    const totalPayout = (fight?.challengerPayout ?? 0) + (fight?.opponentPayout ?? 0);
 
     return new EmbedBuilder()
         .setColor(0xCC6600)
@@ -171,9 +173,9 @@ export function createFightTrackingEmbed(fight) {
                 ].join('\n'),
                 inline: false,
             },
-            { name: 'Winner', value: `<@${fight.winner_id}>`, inline: true },
+            { name: 'Winner', value: winnerValue, inline: true },
             { name: 'Stake Per Fighter', value: formatCurrency(fight.amount || 0, { short: true }), inline: true },
-            { name: 'Pot Paid', value: formatCurrency((fight.amount || 0) * 2, { short: true }), inline: true },
+            { name: 'Pot Paid', value: formatCurrency(totalPayout || (fight.amount || 0) * 2, { short: true }), inline: true },
             { name: 'Resolution', value: fight.disputeResolution || fight.resolutionSource || 'manual', inline: true },
             { name: 'Fight ID', value: fight.id, inline: true },
         )
@@ -182,7 +184,14 @@ export function createFightTrackingEmbed(fight) {
 }
 
 export async function logFightActivity(client, fight) {
-    if (!fight?.guildId || !fight?.winner_id) {
+    const isResolvedFight = Boolean(
+        fight?.winner_id
+        || fight?.fundsRefunded
+        || fight?.status === 'cancelled'
+        || fight?.status === 'completed',
+    );
+
+    if (!fight?.guildId || !isResolvedFight) {
         return;
     }
 
