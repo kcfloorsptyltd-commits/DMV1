@@ -5,7 +5,7 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { getAllLinkedUsernames } from '../../utils/database/osrs.js';
 import { logger } from '../../utils/logger.js';
 
-const AUTO_DELETE_DELAY = 30000; // 30 seconds for the dropdown message
+const AUTO_DELETE_DELAY = 30000; // 30 seconds before removing the dropdown components
 
 export default {
     data: new SlashCommandBuilder()

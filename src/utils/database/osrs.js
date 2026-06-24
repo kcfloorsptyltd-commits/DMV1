@@ -65,6 +65,13 @@ function migrateRecord(record) {
     };
 }
 
+/**
+ * Case-insensitive comparison of two normalized OSRS usernames.
+ */
+function isSameUsername(a, b) {
+    return normalizeOsrsUsername(a)?.toLowerCase() === normalizeOsrsUsername(b)?.toLowerCase();
+}
+
 export async function getOsrsLink(client, guildId, userId) {
     if (!client?.db?.get) {
         throw new Error('Database not available');
@@ -130,7 +137,7 @@ export async function getOsrsLinkByUsername(client, guildId, osrsUsername) {
     if (!record || !Array.isArray(record.osrsUsernames)) return null;
 
     const entry = record.osrsUsernames.find(
-        (e) => normalizeOsrsUsername(e.username)?.toLowerCase() === normalized.toLowerCase()
+        (e) => isSameUsername(e.username, normalized)
             && (!e.status || e.status === OSRS_LINK_STATUSES.LINKED),
     );
 
@@ -162,20 +169,23 @@ export async function linkOsrsUsername(client, guildId, userId, osrsUsername) {
     const record = await getOsrsLink(client, guildId, userId);
     const usernames = Array.isArray(record?.osrsUsernames) ? [...record.osrsUsernames] : [];
     const idx = usernames.findIndex(
-        (e) => normalizeOsrsUsername(e.username)?.toLowerCase() === normalized.toLowerCase(),
+        (e) => isSameUsername(e.username, normalized),
     );
+
+    const existing = idx >= 0 ? usernames[idx] : null;
+    const now = new Date().toISOString();
 
     const entry = {
         username: normalized,
         status: OSRS_LINK_STATUSES.LINKED,
-        requestedAt: idx >= 0 ? usernames[idx].requestedAt : new Date().toISOString(),
-        approvedAt: new Date().toISOString(),
+        requestedAt: existing?.requestedAt ?? now,
+        approvedAt: now,
         approvedBy: null,
         declinedAt: null,
         declinedBy: null,
         declineReason: null,
         ticketId: null,
-        linkedAt: idx >= 0 ? (usernames[idx].linkedAt || new Date().toISOString()) : new Date().toISOString(),
+        linkedAt: existing?.linkedAt ?? now,
     };
 
     if (idx >= 0) {
@@ -220,7 +230,7 @@ export async function createPendingOsrsLink(client, guildId, userId, osrsUsernam
     const usernames = Array.isArray(record?.osrsUsernames) ? [...record.osrsUsernames] : [];
 
     const existing = usernames.find(
-        (e) => normalizeOsrsUsername(e.username)?.toLowerCase() === normalized.toLowerCase(),
+        (e) => isSameUsername(e.username, normalized),
     );
 
     if (existing) {
@@ -246,7 +256,7 @@ export async function createPendingOsrsLink(client, guildId, userId, osrsUsernam
     };
 
     const idx = usernames.findIndex(
-        (e) => normalizeOsrsUsername(e.username)?.toLowerCase() === normalized.toLowerCase(),
+        (e) => isSameUsername(e.username, normalized),
     );
 
     if (idx >= 0) {
@@ -282,7 +292,7 @@ export async function approvePendingOsrsLink(client, guildId, userId, osrsUserna
     }
 
     const idx = record.osrsUsernames.findIndex(
-        (e) => normalizeOsrsUsername(e.username)?.toLowerCase() === normalized.toLowerCase()
+        (e) => isSameUsername(e.username, normalized)
             && e.status === OSRS_LINK_STATUSES.PENDING,
     );
 
@@ -322,7 +332,7 @@ export async function declinePendingOsrsLink(client, guildId, userId, osrsUserna
     }
 
     const idx = record.osrsUsernames.findIndex(
-        (e) => normalizeOsrsUsername(e.username)?.toLowerCase() === normalized.toLowerCase()
+        (e) => isSameUsername(e.username, normalized)
             && e.status === OSRS_LINK_STATUSES.PENDING,
     );
 
@@ -357,7 +367,7 @@ export async function updateOsrsLinkTicketId(client, guildId, userId, osrsUserna
     if (!record || !Array.isArray(record.osrsUsernames)) return null;
 
     const idx = record.osrsUsernames.findIndex(
-        (e) => normalizeOsrsUsername(e.username)?.toLowerCase() === normalized.toLowerCase(),
+        (e) => isSameUsername(e.username, normalized),
     );
 
     if (idx < 0) return null;
@@ -385,7 +395,7 @@ export async function unlinkSpecificOsrsUsername(client, guildId, userId, osrsUs
     if (!record || !Array.isArray(record.osrsUsernames)) return false;
 
     const idx = record.osrsUsernames.findIndex(
-        (e) => normalizeOsrsUsername(e.username)?.toLowerCase() === normalized.toLowerCase(),
+        (e) => isSameUsername(e.username, normalized),
     );
 
     if (idx < 0) return false;
@@ -435,9 +445,7 @@ export async function createPendingOsrsRemoval(client, guildId, userId, osrsUser
     }
 
     const linkedUsernames = await getAllLinkedUsernames(client, guildId, userId);
-    if (!linkedUsernames.includes(normalized) && !linkedUsernames.some(
-        (u) => u.toLowerCase() === normalized.toLowerCase(),
-    )) {
+    if (!linkedUsernames.some((u) => isSameUsername(u, normalized))) {
         throw new Error(`You do not have **${normalized}** linked to your account.`);
     }
 

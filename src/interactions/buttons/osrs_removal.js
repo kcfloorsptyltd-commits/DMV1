@@ -12,6 +12,8 @@ export default {
     name: 'osrs_removal',
     async execute(interaction, client, args) {
         // customId format: osrs_removal:approve:{userId}:{osrsUsername}
+        // OSRS usernames only contain letters, numbers, and spaces — never colons —
+        // so joining with ':' safely reconstructs the original username.
         const [action, userId, ...usernameParts] = args;
         const osrsUsername = usernameParts.join(':');
 
