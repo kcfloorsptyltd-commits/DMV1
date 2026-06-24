@@ -9,37 +9,36 @@ export default {
         .setDescription('Clear all messages from a channel'),
 
     execute: withErrorHandling(async (interaction, _config, client) => {
-        // DEFER FIRST to acknowledge the interaction
-        const deferred = await InteractionHelper.safeDefer(interaction, false);
-        if (!deferred) return;
-
-        // Check if user is the server owner
-        if (interaction.user.id !== interaction.guild.ownerId) {
-            await InteractionHelper.safeEditReply(interaction, {
-                embeds: [errorEmbed('Only the server owner can use this command.')],
-            });
-            return;
-        }
-
-        const channel = interaction.channel;
-
-        // Verify bot has permission to manage messages in the channel
-        if (!channel.manageable) {
-            await InteractionHelper.safeEditReply(interaction, {
-                embeds: [errorEmbed('I do not have permission to manage messages in that channel.')],
-            });
-            return;
-        }
-
-        // Verify the channel is a text channel
-        if (!channel.isTextBased()) {
-            await InteractionHelper.safeEditReply(interaction, {
-                embeds: [errorEmbed('That channel is not a text channel.')],
-            });
-            return;
-        }
-
         try {
+            // DEFER FIRST
+            await interaction.deferReply({ ephemeral: false });
+
+            // Check if user is the server owner
+            if (interaction.user.id !== interaction.guild.ownerId) {
+                await interaction.editReply({
+                    embeds: [errorEmbed('Only the server owner can use this command.')],
+                });
+                return;
+            }
+
+            const channel = interaction.channel;
+
+            // Verify the channel is a text channel
+            if (!channel.isTextBased()) {
+                await interaction.editReply({
+                    embeds: [errorEmbed('That channel is not a text channel.')],
+                });
+                return;
+            }
+
+            // Verify bot has permission to manage messages in the channel
+            if (!channel.manageable) {
+                await interaction.editReply({
+                    embeds: [errorEmbed('I do not have permission to manage messages in that channel.')],
+                });
+                return;
+            }
+
             let deleted = 0;
             let lastMessage = null;
 
@@ -61,7 +60,7 @@ export default {
                 await new Promise((resolve) => setTimeout(resolve, 500));
             }
 
-            await InteractionHelper.safeEditReply(interaction, {
+            await interaction.editReply({
                 embeds: [
                     createEmbed({
                         title: '✅ Channel Cleared',
@@ -71,9 +70,17 @@ export default {
                 ],
             });
         } catch (error) {
-            await InteractionHelper.safeEditReply(interaction, {
-                embeds: [errorEmbed(`Failed to clear channel: ${error.message}`)],
-            });
+            console.error('[CLEAR] Error:', error);
+            try {
+                await interaction.editReply({
+                    embeds: [errorEmbed(`Failed to clear channel: ${error.message}`)],
+                });
+            } catch {
+                await interaction.reply({
+                    embeds: [errorEmbed(`Failed to clear channel: ${error.message}`)],
+                    ephemeral: true,
+                });
+            }
         }
     }, { command: 'clear' }),
 };
