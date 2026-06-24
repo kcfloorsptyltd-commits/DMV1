@@ -4,6 +4,7 @@ import { getEconomyData, removeMoney, formatCurrency } from '../../utils/economy
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { logger } from '../../utils/logger.js';
+import { logBalanceTransaction } from '../../utils/fundsTracking.js';
 
 // Use Unicode escape to ensure the emoji is preserved in all environments
 const MONEY_EMOJI = '\u{1F4B0}';
@@ -101,6 +102,25 @@ export default {
       } catch (err) {
         logger.error('Failed to send cleaned embed for remove.balance', err);
         await InteractionHelper.safeEditReply(interaction, { embeds: [embed] });
+      }
+
+      // Log to funds tracking channel
+      try {
+        const amountNum = parseInt(amountStr.replace(/[^0-9]/g, '')) || 0;
+        await logBalanceTransaction(client, guildId, {
+          type: 'remove',
+          targetUserId: target.id,
+          targetUsername: target.username,
+          amount: amountNum,
+          balanceBefore: type === 'bank' ? before.bank : before.wallet,
+          balanceAfter: afterValue,
+          balanceType: type,
+          requestedBy: interaction.user.id,
+          requestedByTag: interaction.user.tag,
+          timestamp: new Date(),
+        });
+      } catch (error) {
+        logger.error('Failed to log balance transaction to funds tracking', error);
       }
 
       // Auto-delete after 10 seconds
