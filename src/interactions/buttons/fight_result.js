@@ -52,6 +52,21 @@ async function sendResultMessages(interaction, winnerId, loserId) {
     return messages.filter(Boolean);
 }
 
+async function sendLoserMessages(interaction, fighterIds = []) {
+    if (!interaction.channel?.send) {
+        return [];
+    }
+
+    const messages = await Promise.all(
+        fighterIds.map((fighterId) => interaction.channel.send({
+            content: `<@${fighterId}> ${FIGHT_RESULT_MESSAGES.loser}`,
+            allowedMentions: { users: [fighterId] },
+        })),
+    );
+
+    return messages.filter(Boolean);
+}
+
 async function sendDisputeMessage(interaction, fight) {
     if (!interaction.channel?.send) {
         return null;
@@ -177,19 +192,11 @@ export default {
                 await interaction.deferUpdate();
                 try {
                     await refundFight(client, currentFight.id);
-                    const challengerMessage = interaction.channel?.send
-                        ? await interaction.channel.send({
-                            content: `<@${currentFight.challenger_id}> ${FIGHT_RESULT_MESSAGES.loser}`,
-                            allowedMentions: { users: [currentFight.challenger_id] },
-                        })
-                        : null;
-                    const opponentMessage = interaction.channel?.send
-                        ? await interaction.channel.send({
-                            content: `<@${currentFight.opponent_id}> ${FIGHT_RESULT_MESSAGES.loser}`,
-                            allowedMentions: { users: [currentFight.opponent_id] },
-                        })
-                        : null;
-                    scheduleFightCleanup(interaction.message, [challengerMessage, opponentMessage].filter(Boolean));
+                    const loserMessages = await sendLoserMessages(interaction, [
+                        currentFight.challenger_id,
+                        currentFight.opponent_id,
+                    ]);
+                    scheduleFightCleanup(interaction.message, loserMessages);
                 } catch (refundError) {
                     await interaction.editReply({ embeds: [errorEmbed(refundError.message)] });
                 }
