@@ -99,138 +99,134 @@ export default {
                 throw new Error('Invalid fight result button.');
             }
 
-            const currentFight = await getFight(client, fightId);
-            if (!currentFight) {
-                throw new Error('Fight not found.');
-            }
+            // DEFER IMMEDIATELY to acknowledge the interaction (must happen within 3 seconds)
+            await interaction.deferUpdate();
 
-            const isChallenger = currentFight.challenger_id === interaction.user.id;
-            const isOpponent = currentFight.opponent_id === interaction.user.id;
-
-            if (!isChallenger && !isOpponent) {
-                await InteractionHelper.safeReply(interaction, {
-                    embeds: [errorEmbed('You are not part of this fight.')],
-                    ephemeral: true,
-                });
-                return;
-            }
-
-            // Dispute can be raised at any time by either fighter
-            if (action === 'dispute') {
-                await interaction.deferUpdate();
-                // Dispute processing happens in background
-                setImmediate(async () => {
-                    try {
-                        const ticketChannel = await createFightDisputeTicket(client, interaction.guild, interaction.member, currentFight);
-                        if (ticketChannel) {
-                            currentFight.ticketId = ticketChannel.id;
-                            currentFight.status = 'ticket_required';
-                            await saveFight(client, currentFight);
-                        }
-                        await logFightStage(client, currentFight, 'ticket_created');
-                        const disputeMessage = await sendDisputeMessage(interaction, currentFight);
-                        scheduleFightCleanup(interaction.message, [disputeMessage].filter(Boolean));
-                    } catch (error) {
-                        // Silently log, interaction window already closed
+            // Now do heavy work in background after defer is sent
+            setImmediate(async () => {
+                try {
+                    const currentFight = await getFight(client, fightId);
+                    if (!currentFight) {
+                        throw new Error('Fight not found.');
                     }
-                });
-                return;
-            }
 
-            const confirmField = isChallenger ? 'challengerConfirmed' : 'opponentConfirmed';
+                    const isChallenger = currentFight.challenger_id === interaction.user.id;
+                    const isOpponent = currentFight.opponent_id === interaction.user.id;
 
-            if (currentFight[confirmField] !== null) {
-                await InteractionHelper.safeReply(interaction, {
-                    embeds: [errorEmbed('You have already submitted your fight result.')],
-                    ephemeral: true,
-                });
-                return;
-            }
-
-            currentFight[confirmField] = action; // 'won' or 'lost'
-            await saveFight(client, currentFight);
-            await logFightStage(client, currentFight, 'result_submitted');
-
-            // Reload fight from database to get updated state from both fighters
-            const updatedFight = await getFight(client, fightId);
-            const challengerConfirmed = updatedFight.challengerConfirmed;
-            const opponentConfirmed = updatedFight.opponentConfirmed;
-
-            // Still waiting for the other fighter
-            if (challengerConfirmed === null || opponentConfirmed === null) {
-                const waitingForId = challengerConfirmed === null
-                    ? updatedFight.challenger_id
-                    : updatedFight.opponent_id;
-                await interaction.update({
-                    embeds: [createFightResultWaitingEmbed(updatedFight, waitingForId)],
-                    components: [createFightResultConfirmationRow(updatedFight.id)],
-                });
-                return;
-            }
-
-            // Both claim they won → dispute
-            if (challengerConfirmed === 'won' && opponentConfirmed === 'won') {
-                await interaction.deferUpdate();
-                // Dispute processing happens in background
-                setImmediate(async () => {
-                    try {
-                        const ticketChannel = await createFightDisputeTicket(client, interaction.guild, interaction.member, updatedFight);
-                        if (ticketChannel) {
-                            updatedFight.ticketId = ticketChannel.id;
-                            updatedFight.status = 'ticket_required';
-                            await saveFight(client, updatedFight);
-                        }
-                        await logFightStage(client, updatedFight, 'ticket_created');
-                        const disputeMessage = await sendDisputeMessage(interaction, updatedFight);
-                        scheduleFightCleanup(interaction.message, [disputeMessage].filter(Boolean));
-                    } catch (error) {
-                        // Silently log, interaction window already closed
+                    if (!isChallenger && !isOpponent) {
+                        await InteractionHelper.safeReply(interaction, {
+                            embeds: [errorEmbed('You are not part of this fight.')],
+                            ephemeral: true,
+                        });
+                        return;
                     }
-                });
-                return;
-            }
 
-            // Agreement: one won, one lost → payout winner
-            if (
-                (challengerConfirmed === 'won' && opponentConfirmed === 'lost') ||
-                (challengerConfirmed === 'lost' && opponentConfirmed === 'won')
-            ) {
-                await interaction.deferUpdate();
-                setImmediate(async () => {
-                    try {
-                        const winnerId = challengerConfirmed === 'won'
+                    // Dispute can be raised at any time by either fighter
+                    if (action === 'dispute') {
+                        try {
+                            const ticketChannel = await createFightDisputeTicket(client, interaction.guild, interaction.member, currentFight);
+                            if (ticketChannel) {
+                                currentFight.ticketId = ticketChannel.id;
+                                currentFight.status = 'ticket_required';
+                                await saveFight(client, currentFight);
+                            }
+                            await logFightStage(client, currentFight, 'ticket_created');
+                            const disputeMessage = await sendDisputeMessage(interaction, currentFight);
+                            scheduleFightCleanup(interaction.message, [disputeMessage].filter(Boolean));
+                        } catch (error) {
+                            // Silently log
+                        }
+                        return;
+                    }
+
+                    const confirmField = isChallenger ? 'challengerConfirmed' : 'opponentConfirmed';
+
+                    if (currentFight[confirmField] !== null) {
+                        await InteractionHelper.safeReply(interaction, {
+                            embeds: [errorEmbed('You have already submitted your fight result.')],
+                            ephemeral: true,
+                        });
+                        return;
+                    }
+
+                    currentFight[confirmField] = action; // 'won' or 'lost'
+                    await saveFight(client, currentFight);
+                    await logFightStage(client, currentFight, 'result_submitted');
+
+                    // Reload fight from database to get updated state from both fighters
+                    const updatedFight = await getFight(client, fightId);
+                    const challengerConfirmed = updatedFight.challengerConfirmed;
+                    const opponentConfirmed = updatedFight.opponentConfirmed;
+
+                    // Still waiting for the other fighter
+                    if (challengerConfirmed === null || opponentConfirmed === null) {
+                        const waitingForId = challengerConfirmed === null
                             ? updatedFight.challenger_id
                             : updatedFight.opponent_id;
-                        const loserId = winnerId === updatedFight.challenger_id
-                            ? updatedFight.opponent_id
-                            : updatedFight.challenger_id;
-                        await payoutFightWinner(client, updatedFight.id, winnerId, { source: 'dual_confirmation' });
-                        const resultMessages = await sendResultMessages(interaction, winnerId, loserId);
-                        scheduleFightCleanup(interaction.message, resultMessages);
-                    } catch (payoutError) {
-                        // Silently log
+                        await interaction.editReply({
+                            embeds: [createFightResultWaitingEmbed(updatedFight, waitingForId)],
+                            components: [createFightResultConfirmationRow(updatedFight.id)],
+                        });
+                        return;
                     }
-                });
-                return;
-            }
 
-            // Both claim they lost → refund both
-            if (challengerConfirmed === 'lost' && opponentConfirmed === 'lost') {
-                await interaction.deferUpdate();
-                setImmediate(async () => {
-                    try {
-                        await refundFight(client, updatedFight.id);
-                        const loserMessages = await sendLoserMessages(interaction, [
-                            updatedFight.challenger_id,
-                            updatedFight.opponent_id,
-                        ]);
-                        scheduleFightCleanup(interaction.message, loserMessages);
-                    } catch (refundError) {
-                        // Silently log
+                    // Both claim they won → dispute
+                    if (challengerConfirmed === 'won' && opponentConfirmed === 'won') {
+                        try {
+                            const ticketChannel = await createFightDisputeTicket(client, interaction.guild, interaction.member, updatedFight);
+                            if (ticketChannel) {
+                                updatedFight.ticketId = ticketChannel.id;
+                                updatedFight.status = 'ticket_required';
+                                await saveFight(client, updatedFight);
+                            }
+                            await logFightStage(client, updatedFight, 'ticket_created');
+                            const disputeMessage = await sendDisputeMessage(interaction, updatedFight);
+                            scheduleFightCleanup(interaction.message, [disputeMessage].filter(Boolean));
+                        } catch (error) {
+                            // Silently log
+                        }
+                        return;
                     }
-                });
-                return;
-            }
+
+                    // Agreement: one won, one lost → payout winner
+                    if (
+                        (challengerConfirmed === 'won' && opponentConfirmed === 'lost') ||
+                        (challengerConfirmed === 'lost' && opponentConfirmed === 'won')
+                    ) {
+                        try {
+                            const winnerId = challengerConfirmed === 'won'
+                                ? updatedFight.challenger_id
+                                : updatedFight.opponent_id;
+                            const loserId = winnerId === updatedFight.challenger_id
+                                ? updatedFight.opponent_id
+                                : updatedFight.challenger_id;
+                            await payoutFightWinner(client, updatedFight.id, winnerId, { source: 'dual_confirmation' });
+                            const resultMessages = await sendResultMessages(interaction, winnerId, loserId);
+                            scheduleFightCleanup(interaction.message, resultMessages);
+                        } catch (payoutError) {
+                            // Silently log
+                        }
+                        return;
+                    }
+
+                    // Both claim they lost → refund both
+                    if (challengerConfirmed === 'lost' && opponentConfirmed === 'lost') {
+                        try {
+                            await refundFight(client, updatedFight.id);
+                            const loserMessages = await sendLoserMessages(interaction, [
+                                updatedFight.challenger_id,
+                                updatedFight.opponent_id,
+                            ]);
+                            scheduleFightCleanup(interaction.message, loserMessages);
+                        } catch (refundError) {
+                            // Silently log
+                        }
+                        return;
+                    }
+                } catch (error) {
+                    // Background task error - silently log
+                }
+            });
         } catch (error) {
             await InteractionHelper.safeReply(interaction, {
                 embeds: [errorEmbed(error.message)],
