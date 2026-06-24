@@ -183,6 +183,63 @@ export function createFightTrackingEmbed(fight) {
         .setTimestamp(timestamp);
 }
 
+export function createFightStageEmbed(fight, stage) {
+    const now = new Date();
+    const stageTitles = {
+        challenged: '⚔️ Fight Challenged',
+        accepted: '⚔️ Fight Accepted',
+        result_submitted: '📝 Fight Result Submitted',
+        ticket_created: '⚠️ Fight Dispute — Ticket Created',
+    };
+    const stageColors = {
+        challenged: 0xFFAA00,
+        accepted: 0x00AA44,
+        result_submitted: 0x0088CC,
+        ticket_created: 0xCC2200,
+    };
+
+    const fighters = [
+        `<@${fight.challenger_id}> (${fight.challengerOsrsUsername || 'Unknown'})`,
+        `vs`,
+        `<@${fight.opponent_id}> (${fight.opponentOsrsUsername || 'Unknown'})`,
+    ].join('\n');
+
+    const embed = new EmbedBuilder()
+        .setColor(stageColors[stage] ?? 0x888888)
+        .setTitle(stageTitles[stage] ?? '⚔️ Fight Update')
+        .addFields(
+            { name: 'Fighters', value: fighters, inline: false },
+            { name: 'Stake Per Fighter', value: formatCurrency(fight.amount || 0, { short: true }), inline: true },
+            { name: 'Fight ID', value: fight.id, inline: true },
+        )
+        .setFooter({ text: `${stageTitles[stage] ?? 'Fight update'} • ${now.toISOString()}` })
+        .setTimestamp(now);
+
+    if (stage === 'result_submitted') {
+        const challengerResult = fight.challengerConfirmed ? `**${fight.challengerConfirmed}**` : 'pending';
+        const opponentResult = fight.opponentConfirmed ? `**${fight.opponentConfirmed}**` : 'pending';
+        embed.addFields(
+            { name: `<@${fight.challenger_id}> submitted`, value: challengerResult, inline: true },
+            { name: `<@${fight.opponent_id}> submitted`, value: opponentResult, inline: true },
+        );
+    }
+
+    return embed;
+}
+
+export async function logFightStage(client, fight, stage) {
+    if (!fight?.guildId) {
+        return;
+    }
+
+    await sendTrackingEmbed(client, fight.guildId, {
+        channelConfigKey: 'fightTrackingChannelId',
+        embed: createFightStageEmbed(fight, stage),
+        logContext: 'FIGHT_TRACKING',
+        restrictVisibility: true,
+    });
+}
+
 export async function logFightActivity(client, fight) {
     const isResolvedFight = Boolean(
         fight?.winner_id

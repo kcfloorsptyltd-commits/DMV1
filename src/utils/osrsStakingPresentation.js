@@ -74,14 +74,19 @@ export function createFightActionRow(fightId, disabled = false) {
 export function createFightResultConfirmationRow(fightId, disabled = false) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`fight_result:accept:${fightId}`)
-            .setLabel('✅ Accept')
+            .setCustomId(`fight_result:won:${fightId}`)
+            .setLabel('✅ I Won')
             .setStyle(ButtonStyle.Success)
+            .setDisabled(disabled),
+        new ButtonBuilder()
+            .setCustomId(`fight_result:lost:${fightId}`)
+            .setLabel('❌ I Lost')
+            .setStyle(ButtonStyle.Danger)
             .setDisabled(disabled),
         new ButtonBuilder()
             .setCustomId(`fight_result:dispute:${fightId}`)
             .setLabel('🚨 Dispute')
-            .setStyle(ButtonStyle.Danger)
+            .setStyle(ButtonStyle.Secondary)
             .setDisabled(disabled),
     );
 }
@@ -189,7 +194,22 @@ export function createFightActiveEmbed(fight) {
             { name: `Opponent for <@${fight.opponent_id}>`, value: fight.challengerOsrsUsername || 'Unknown', inline: false },
             { name: 'Resolve By', value: `<t:${Math.floor(new Date(fight.expiresAt).getTime() / 1000)}:R>`, inline: false },
         ],
-        footer: 'Use /fight-results to confirm the outcome',
+        footer: 'Click ✅ I Won, ❌ I Lost, or 🚨 Dispute to report your result',
+    });
+}
+
+export function createFightResultWaitingEmbed(fight, waitingForId) {
+    return createEmbed({
+        title: 'OSRS Fight — Waiting for Confirmation',
+        description: `One fighter has submitted their result. Waiting for <@${waitingForId}> to confirm.`,
+        color: 'info',
+        fields: [
+            { name: 'Fight ID', value: fight.id, inline: true },
+            { name: 'Pot', value: formatCurrency(fight.amount * 2, { short: true }), inline: true },
+            { name: `<@${fight.challenger_id}> submitted`, value: fight.challengerConfirmed ?? 'pending', inline: true },
+            { name: `<@${fight.opponent_id}> submitted`, value: fight.opponentConfirmed ?? 'pending', inline: true },
+        ],
+        footer: 'Click ✅ I Won, ❌ I Lost, or 🚨 Dispute to report your result',
     });
 }
 
