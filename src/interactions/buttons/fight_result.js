@@ -28,9 +28,20 @@ async function deleteMessage(message) {
 
 function scheduleFightCleanup(fightMessage, notificationMessages = []) {
     setTimeout(async () => {
-        await Promise.all(notificationMessages.map((message) => deleteMessage(message)));
-        await deleteMessage(fightMessage);
+        try {
+            await Promise.all(notificationMessages.map((message) => deleteMessage(message)));
+            await deleteMessage(fightMessage);
+        } catch {
+            // Cleanup failures are non-fatal and should not disrupt fight flow
+        }
     }, RESULT_MESSAGE_TTL_MS);
+}
+
+async function sendTemporaryMessages(messagePromises) {
+    const results = await Promise.allSettled(messagePromises);
+    return results
+        .filter((result) => result.status === 'fulfilled' && result.value)
+        .map((result) => result.value);
 }
 
 async function sendResultMessages(interaction, winnerId, loserId) {
@@ -38,7 +49,7 @@ async function sendResultMessages(interaction, winnerId, loserId) {
         return [];
     }
 
-    const messages = await Promise.all([
+    return sendTemporaryMessages([
         interaction.channel.send({
             content: `<@${winnerId}> ${FIGHT_RESULT_MESSAGES.winner}`,
             allowedMentions: { users: [winnerId] },
@@ -48,8 +59,6 @@ async function sendResultMessages(interaction, winnerId, loserId) {
             allowedMentions: { users: [loserId] },
         }),
     ]);
-
-    return messages.filter(Boolean);
 }
 
 async function sendLoserMessages(interaction, fighterIds = []) {
@@ -57,14 +66,12 @@ async function sendLoserMessages(interaction, fighterIds = []) {
         return [];
     }
 
-    const messages = await Promise.all(
+    return sendTemporaryMessages(
         fighterIds.map((fighterId) => interaction.channel.send({
             content: `<@${fighterId}> ${FIGHT_RESULT_MESSAGES.loser}`,
             allowedMentions: { users: [fighterId] },
         })),
     );
-
-    return messages.filter(Boolean);
 }
 
 async function sendDisputeMessage(interaction, fight) {
