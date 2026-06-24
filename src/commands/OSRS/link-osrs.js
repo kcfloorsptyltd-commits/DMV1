@@ -10,6 +10,8 @@ import { logger } from '../../utils/logger.js';
 
 console.log('[DEBUG] link-osrs.js imports loaded successfully');
 
+const AUTO_DELETE_DELAY = 10000; // 10 seconds
+
 export default {
     data: new SlashCommandBuilder()
         .setName('link-osrs')
@@ -97,6 +99,15 @@ export default {
                     }),
                 ],
             });
+
+            // Auto-delete after 10 seconds
+            setTimeout(async () => {
+                try {
+                    await interaction.deleteReply();
+                } catch (error) {
+                    logger.debug('Could not auto-delete link-osrs message', { error: error.message });
+                }
+            }, AUTO_DELETE_DELAY);
         } catch (error) {
             await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed(error.message)] });
         }
