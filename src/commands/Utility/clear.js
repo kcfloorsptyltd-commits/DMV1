@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder } from 'discord.js';
 import { errorEmbed, createEmbed } from '../../utils/embeds.js';
 import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -6,20 +6,22 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 export default {
     data: new SlashCommandBuilder()
         .setName('clear')
-        .setDescription('Clear all messages from a channel')
-        .addChannelOption((option) =>
-            option
-                .setName('channel')
-                .setDescription('The channel to clear messages from')
-                .setRequired(true),
-        )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+        .setDescription('Clear all messages from a channel'),
 
     execute: withErrorHandling(async (interaction, _config, client) => {
+        // Check if user is the server owner
+        if (interaction.user.id !== interaction.guild.ownerId) {
+            await InteractionHelper.safeReply(interaction, {
+                embeds: [errorEmbed('Only the server owner can use this command.')],
+                ephemeral: true,
+            });
+            return;
+        }
+
         const deferred = await InteractionHelper.safeDefer(interaction, false);
         if (!deferred) return;
 
-        const channel = interaction.options.getChannel('channel', true);
+        const channel = interaction.channel;
 
         // Verify bot has permission to manage messages in the channel
         if (!channel.manageable) {
