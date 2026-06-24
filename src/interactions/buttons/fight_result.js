@@ -14,6 +14,8 @@ const FIGHT_RESULT_MESSAGES = {
     winner: '🎉 Congratulations you have won and the funds have been awarded to your balance',
     loser: '😢 Oh nooo better luck next time!',
     dispute: '⚠️ Oh noo a dispute has been made please come to the ticket',
+    opponentWon: '⚠️ Your opponent has chosen: I Won',
+    opponentLost: '⚠️ Your opponent has chosen: I Lost',
 };
 
 async function deleteMessage(message) {
@@ -89,6 +91,22 @@ async function sendDisputeMessage(interaction, fight) {
     return disputeMessage || null;
 }
 
+async function sendOpponentChoiceMessage(interaction, opponentId, choice) {
+    if (!interaction.channel?.send) {
+        return null;
+    }
+
+    const message = choice === 'won' ? FIGHT_RESULT_MESSAGES.opponentWon : FIGHT_RESULT_MESSAGES.opponentLost;
+    const [choiceMessage] = await sendTemporaryMessages([
+        interaction.channel.send({
+            content: `<@${opponentId}> ${message}`,
+            allowedMentions: { users: [opponentId] },
+        }),
+    ]);
+
+    return choiceMessage || null;
+}
+
 export default {
     name: 'fight_result',
     async execute(interaction, client, args) {
@@ -131,8 +149,7 @@ export default {
                                 await saveFight(client, currentFight);
                             }
                             await logFightStage(client, currentFight, 'ticket_created');
-                            const disputeMessage = await sendDisputeMessage(interaction, currentFight);
-                            scheduleFightCleanup(interaction.message, [disputeMessage].filter(Boolean));
+                            await sendDisputeMessage(interaction, currentFight);
                         } catch (error) {
                             // Silently log
                         }
