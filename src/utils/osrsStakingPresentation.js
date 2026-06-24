@@ -62,8 +62,8 @@ export function formatFightPayoutSummary(fight) {
     ].join('\n');
 }
 
-export function createFightActionRow(fightId, disabled = false) {
-    return new ActionRowBuilder().addComponents(
+export function createFightActionRow(fightId, disabled = false, isChallenger = false) {
+    const components = [
         new ButtonBuilder()
             .setCustomId(`fight:accept:${fightId}`)
             .setLabel('Accept')
@@ -74,7 +74,20 @@ export function createFightActionRow(fightId, disabled = false) {
             .setLabel('Decline')
             .setStyle(ButtonStyle.Danger)
             .setDisabled(disabled),
-    );
+    ];
+
+    // Add Cancel button only for challenger and only if not disabled
+    if (isChallenger && !disabled) {
+        components.push(
+            new ButtonBuilder()
+                .setCustomId(`fight:cancel:${fightId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(false),
+        );
+    }
+
+    return new ActionRowBuilder().addComponents(components);
 }
 
 export function createFightResultConfirmationRow(fightId, disabled = false) {
@@ -240,7 +253,8 @@ export function createFightConfirmedEmbed(fight, confirmerId, confirmation) {
     }
     return createEmbed({
         title: 'Fight Result Recorded',
-        description: `<@${confirmerId}> has submitted: **${label}**.\nThe other fighter can use the buttons below, /fight-results, or the Dink webhook to finish the outcome.`,
+        description: `<@${confirmerId}> has submitted: **${label}**.
+The other fighter can use the buttons below, /fight-results, or the Dink webhook to finish the outcome.`,
         color: 'info',
         fields: [
             { name: 'Fight ID', value: fight.id, inline: true },

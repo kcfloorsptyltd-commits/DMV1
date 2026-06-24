@@ -42,11 +42,13 @@ export default {
 
         try {
             const fight = await handleFightChallenge(client, interaction.guildId, interaction.user.id, opponent.id, parsedAmount);
+            
+            // Pass isChallenger=true to show Cancel button only to the challenger
             await InteractionHelper.safeEditReply(interaction, {
                 content: `<@${opponent.id}>`,
                 allowedMentions: { users: [opponent.id] },
                 embeds: [createFightChallengeEmbed(fight)],
-                components: [createFightActionRow(fight.id)],
+                components: [createFightActionRow(fight.id, false, true)],
             });
 
             const reply = await interaction.fetchReply();
