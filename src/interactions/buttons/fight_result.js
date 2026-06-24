@@ -11,16 +11,6 @@ import { Mutex } from '../../utils/mutex.js';
 
 const RESULT_MESSAGE_TTL_MS = 30_000;
 
-// Mutex to prevent race conditions on fight result processing
-const fightMutexes = new Map();
-
-function getFightMutex(fightId) {
-    if (!fightMutexes.has(fightId)) {
-        fightMutexes.set(fightId, new Mutex());
-    }
-    return fightMutexes.get(fightId);
-}
-
 const FIGHT_RESULT_MESSAGES = {
     winner: '🎉 Congratulations you have won and the funds have been awarded to your balance',
     loser: '😢 Oh nooo better luck next time!',
@@ -114,11 +104,8 @@ export default {
             await interaction.deferUpdate();
 
             // Now do heavy work in background after defer is sent
-            setImmediate(async () => {
-                // Acquire mutex lock for this fight to prevent race conditions
-                const mutex = getFightMutex(fightId);
-                const release = await mutex.lock();
-
+            // Use Mutex to prevent race conditions on fight result processing
+            Mutex.runExclusive(`fight:${fightId}`, async () => {
                 try {
                     const currentFight = await getFight(client, fightId);
                     if (!currentFight) {
@@ -262,9 +249,6 @@ export default {
                     }
                 } catch (error) {
                     // Background task error - silently log
-                } finally {
-                    // Always release the mutex lock
-                    release();
                 }
             });
         } catch (error) {
