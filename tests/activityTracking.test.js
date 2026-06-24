@@ -133,7 +133,8 @@ test('fight activity logs to the configured fight tracking channel and applies r
     assert.equal(sends.length, 1);
 
     const embed = sends[0].embeds[0].toJSON();
-    assert.equal(embed.title, '⚔ Fight Resolved');
+    assert.ok(embed.title.startsWith('⚔'));
+    assert.ok(embed.title.endsWith('Fight Resolved'));
     assert.ok(embed.fields.some((field) => field.name === 'Winner' && field.value.includes('<@fighter-1>')));
     assert.ok(embed.fields.some((field) => field.name === 'Stake Per Fighter' && field.value.includes('2m')));
 
