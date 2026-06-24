@@ -276,6 +276,8 @@ export function validateConfig(config) {
     logger.debug('TOKEN exists:', !!process.env.TOKEN);
     logger.debug('CLIENT_ID exists:', !!process.env.CLIENT_ID);
     logger.debug('GUILD_ID exists:', !!process.env.GUILD_ID);
+    logger.debug('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    logger.debug('POSTGRES_URL exists:', !!process.env.POSTGRES_URL);
     logger.debug('POSTGRES_HOST exists:', !!process.env.POSTGRES_HOST);
     logger.debug('NODE_ENV:', process.env.NODE_ENV);
   }
@@ -289,14 +291,15 @@ export function validateConfig(config) {
   }
 
   if (process.env.NODE_ENV === 'production') {
-    if (!process.env.POSTGRES_HOST) {
-      errors.push("PostgreSQL host is required in production (POSTGRES_HOST environment variable)");
-    }
-    if (!process.env.POSTGRES_USER) {
-      errors.push("PostgreSQL user is required in production (POSTGRES_USER environment variable)");
-    }
-    if (!process.env.POSTGRES_PASSWORD) {
-      errors.push("PostgreSQL password is required in production (POSTGRES_PASSWORD environment variable)");
+    const hasConnectionUrl = !!(process.env.DATABASE_URL || process.env.POSTGRES_URL);
+    const hasIndividualVars = !!(process.env.POSTGRES_HOST && process.env.POSTGRES_USER && process.env.POSTGRES_PASSWORD);
+
+    if (!hasConnectionUrl && !hasIndividualVars) {
+      errors.push(
+        "PostgreSQL connection is required in production. " +
+        "Provide either a connection string (DATABASE_URL or POSTGRES_URL) " +
+        "or all three individual variables (POSTGRES_HOST, POSTGRES_USER, POSTGRES_PASSWORD)."
+      );
     }
   }
 
