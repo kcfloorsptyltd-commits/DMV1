@@ -11,7 +11,11 @@ import { getOsrsAdminPermissionError, isAuthorizedOsrsAdmin } from '../../utils/
 export default {
     name: 'osrs_removal',
     async execute(interaction, client, args) {
-        const [action, userId] = args;
+        // customId format: osrs_removal:approve:{userId}:{osrsUsername}
+        // OSRS usernames only contain letters, numbers, and spaces — never colons —
+        // so joining with ':' safely reconstructs the original username.
+        const [action, userId, ...usernameParts] = args;
+        const osrsUsername = usernameParts.join(':');
 
         const deferSuccess = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
         if (!deferSuccess) return;
@@ -29,12 +33,17 @@ export default {
                 return;
             }
 
+            if (!osrsUsername) {
+                await InteractionHelper.safeEditReply(interaction, { embeds: [errorEmbed('Invalid button: missing OSRS username.')] });
+                return;
+            }
+
             if (action === 'approve') {
-                const updated = await handleOsrsRemovalApproval(client, interaction.guildId, userId, interaction.user.id);
+                const updated = await handleOsrsRemovalApproval(client, interaction.guildId, userId, osrsUsername, interaction.user.id);
                 await InteractionHelper.safeEditReply(interaction, {
                     embeds: [createEmbed({
                         title: '✅ RSN Removal Approved',
-                        description: `<@${userId}>'s OSRS username **${updated.osrsUsername || 'Unknown'}** has been removed.`,
+                        description: `<@${userId}>'s OSRS username **${updated.osrsUsername || osrsUsername}** has been removed.`,
                         color: 'success',
                     })],
                 });
@@ -44,11 +53,11 @@ export default {
             }
 
             if (action === 'decline') {
-                const updated = await handleOsrsRemovalDecline(client, interaction.guildId, userId, interaction.user.id);
+                const updated = await handleOsrsRemovalDecline(client, interaction.guildId, userId, osrsUsername, interaction.user.id);
                 await InteractionHelper.safeEditReply(interaction, {
                     embeds: [createEmbed({
                         title: '❌ RSN Removal Declined',
-                        description: `<@${userId}>'s RSN removal request for **${updated.osrsUsername}** has been declined.`,
+                        description: `<@${userId}>'s RSN removal request for **${updated.osrsUsername || osrsUsername}** has been declined.`,
                         color: 'error',
                     })],
                 });

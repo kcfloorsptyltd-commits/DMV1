@@ -41,7 +41,6 @@ export default {
             const categoryId = config.ticketCategoryId || null;
 
             let ticketChannel = null;
-            let ticketNumber = null;
 
             try {
                 const ticketResult = await createTicket(
@@ -53,12 +52,12 @@ export default {
 
                 if (ticketResult.success && ticketResult.channel) {
                     ticketChannel = ticketResult.channel;
-                    ticketNumber = ticketResult.ticketData?.id || ticketResult.channel.name;
 
                     await updateOsrsLinkTicketId(
                         client,
                         interaction.guildId,
                         interaction.user.id,
+                        pendingRecord.osrsUsername,
                         ticketChannel.id,
                     );
 
@@ -67,7 +66,7 @@ export default {
                         pendingRecord.osrsUsername,
                         pendingRecord.requestedAt,
                     );
-                    const approvalRow = createLinkApprovalRow(interaction.user.id);
+                    const approvalRow = createLinkApprovalRow(interaction.user.id, pendingRecord.osrsUsername);
 
                     await ticketChannel.send({
                         embeds: [approvalEmbed],

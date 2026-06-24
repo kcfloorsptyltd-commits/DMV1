@@ -102,3 +102,7 @@ export function getOsrsLinksPrefix(guildId) {
 export function getOsrsPendingRemovalKey(guildId, userId) {
     return `guild:${guildId}:osrs:pending_removal:${userId}`;
 }
+
+export function getOsrsPendingRemovalKeyForUsername(guildId, userId, osrsUsername) {
+    return `guild:${guildId}:osrs:pending_removal:${userId}:${osrsUsername.toLowerCase()}`;
+}
