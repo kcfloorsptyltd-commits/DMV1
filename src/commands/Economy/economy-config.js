@@ -1,8 +1,9 @@
-import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ChannelSelectMenuBuilder, EmbedBuilder, ComponentType } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ChannelSelectMenuBuilder, EmbedBuilder, ComponentType, MessageFlags } from 'discord.js';
 import { createEmbed, successEmbed, errorEmbed } from '../../utils/embeds.js';
 import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { getGuildConfig, setGuildConfig } from '../../services/guildConfig.js';
+import { getGuildConfig } from '../../services/guildConfig.js';
+import { getGuildConfigKey } from '../../utils/database.js';
 import { getColor } from '../../config/bot.js';
 import { logger } from '../../utils/logger.js';
 
@@ -34,22 +35,24 @@ export default {
         const guildId = interaction.guildId;
 
         if (subcommand === 'set-funds-tracking') {
+            const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
+            if (!deferred) return;
+
             const channel = interaction.options.getChannel('channel', true);
             const guildConfig = await getGuildConfig(client, guildId);
 
             // Check bot permissions
             const botPermissions = channel.permissionsFor(client.user);
             if (!botPermissions.has(['SendMessages', 'EmbedLinks'])) {
-                await InteractionHelper.safeReply(interaction, {
+                await InteractionHelper.safeEditReply(interaction, {
                     embeds: [errorEmbed('Bot Permissions Error', 'I need SendMessages and EmbedLinks permissions in that channel to send logs.')],
-                    ephemeral: true,
                 });
                 return;
             }
 
             // Update config
             guildConfig.fundsTrackingChannelId = channel.id;
-            await setGuildConfig(client, guildId, guildConfig);
+            await client.db.set(getGuildConfigKey(guildId), guildConfig);
 
             logger.info('[ECONOMY_CONFIG] Funds tracking channel set', {
                 guildId,
@@ -57,14 +60,16 @@ export default {
                 userId: interaction.user.id,
             });
 
-            await InteractionHelper.safeReply(interaction, {
+            await InteractionHelper.safeEditReply(interaction, {
                 embeds: [successEmbed(
                     '💰 Funds Tracking Configured',
                     `Funds tracking logs will be sent to ${channel}.\n\nWhen admins use \`/add balance\` or \`/remove balance\`, a detailed transaction log will appear in that channel.\n\n**Visibility:** Only Admins, Server Owner, and Support role can see these logs.`
                 )],
-                ephemeral: true,
             });
         } else if (subcommand === 'dashboard') {
+            const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
+            if (!deferred) return;
+
             const guildConfig = await getGuildConfig(client, guildId);
             const guild = interaction.guild;
 
@@ -92,7 +97,7 @@ export default {
 
             const selectRow = new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
-                    .setCustomId('economy_config_select')
+                    .setCustomId(`economy_config_select_${guildId}`)
                     .setPlaceholder('Select an option...')
                     .addOptions(
                         new StringSelectMenuOptionBuilder()
@@ -108,15 +113,15 @@ export default {
                     )
             );
 
-            const response = await InteractionHelper.safeReply(interaction, {
+            await InteractionHelper.safeEditReply(interaction, {
                 embeds: [embed],
                 components: [selectRow],
-                ephemeral: true,
             });
 
-            const collector = response.createMessageComponentCollector({
+            // Setup collector
+            const collector = interaction.channel.createMessageComponentCollector({
                 componentType: ComponentType.StringSelect,
-                filter: i => i.user.id === interaction.user.id,
+                filter: i => i.user.id === interaction.user.id && i.customId === `economy_config_select_${guildId}`,
                 time: 60_000,
             });
 
@@ -125,7 +130,7 @@ export default {
 
                 if (selectInteraction.values[0] === 'set_funds_channel') {
                     const channelSelect = new ChannelSelectMenuBuilder()
-                        .setCustomId('economy_funds_channel_select')
+                        .setCustomId(`economy_funds_channel_${guildId}`)
                         .setPlaceholder('Select a text channel...')
                         .addChannelTypes(ChannelType.GuildText)
                         .setMaxValues(1);
@@ -143,7 +148,7 @@ export default {
 
                     const channelCollector = selectInteraction.channel.createMessageComponentCollector({
                         componentType: ComponentType.ChannelSelect,
-                        filter: i => i.user.id === interaction.user.id,
+                        filter: i => i.user.id === interaction.user.id && i.customId === `economy_funds_channel_${guildId}`,
                         time: 60_000,
                         max: 1,
                     });
@@ -154,7 +159,7 @@ export default {
 
                         const updatedConfig = await getGuildConfig(client, guildId);
                         updatedConfig.fundsTrackingChannelId = selectedChannel.id;
-                        await setGuildConfig(client, guildId, updatedConfig);
+                        await client.db.set(getGuildConfigKey(guildId), updatedConfig);
 
                         logger.info('[ECONOMY_CONFIG] Funds tracking channel updated', {
                             guildId,
@@ -169,7 +174,7 @@ export default {
                 } else if (selectInteraction.values[0] === 'clear_funds_channel') {
                     const updatedConfig = await getGuildConfig(client, guildId);
                     updatedConfig.fundsTrackingChannelId = null;
-                    await setGuildConfig(client, guildId, updatedConfig);
+                    await client.db.set(getGuildConfigKey(guildId), updatedConfig);
 
                     logger.info('[ECONOMY_CONFIG] Funds tracking channel cleared', { guildId });
 
@@ -181,7 +186,7 @@ export default {
             });
 
             collector.on('end', () => {
-                // Dashboard closes after timeout
+                logger.debug('[ECONOMY_CONFIG] Dashboard collector ended');
             });
         }
     }, { command: 'economy-config' })
