@@ -4,6 +4,7 @@ import { getEconomyData, removeMoney, addMoney, formatCurrency, parseHumanAmount
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { logger } from '../../utils/logger.js';
+import { logTradeActivity } from '../../utils/activityTracking.js';
 
 // Unicode money emoji fallback
 const MONEY_EMOJI = '\u{1F4B0}';
@@ -176,6 +177,17 @@ ${target}, you have 2 minutes to Accept or Decline.`,
 
         await offerMessage.edit({ embeds: [successEmbed], components: [disabledRow] }).catch((err) => {
           logger.error('Failed to send trade success embed', err);
+        });
+
+        await logTradeActivity(client, guildId, {
+          senderId: sender.id,
+          senderTag: sender.tag,
+          recipientId: target.id,
+          recipientTag: target.tag,
+          amount: parsedAmount,
+          senderBalance: afterSender,
+          recipientBalance: afterTarget,
+          timestamp: new Date(),
         });
 
         logger.info('[ECONOMY] Trade completed', { from: sender.id, to: target.id, amount: parsedAmount });

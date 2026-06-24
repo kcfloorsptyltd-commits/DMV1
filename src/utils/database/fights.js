@@ -1,4 +1,5 @@
 import { addMoney } from '../economy.js';
+import { logFightActivity } from '../activityTracking.js';
 import { getFightCounterKey, getFightKey } from './keys.js';
 
 export const FIGHT_STATUSES = {
@@ -265,5 +266,6 @@ export async function payoutFightWinner(client, fightId, winnerId, resolution = 
     fight.challengerPayout = resolution.challengerPayout ?? (winnerId === fight.challenger_id ? fight.amount * 2 : 0);
     fight.opponentPayout = resolution.opponentPayout ?? (winnerId === fight.opponent_id ? fight.amount * 2 : 0);
     await saveFight(client, fight);
+    await logFightActivity(client, fight);
     return fight;
 }
