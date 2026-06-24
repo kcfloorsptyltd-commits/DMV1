@@ -92,6 +92,16 @@ async function sendDisputeMessage(interaction, fight) {
 async function handleDisputeAction(interaction, client, fight) {
     await interaction.deferUpdate();
 
+    // Immediately disable buttons to acknowledge the action
+    try {
+        await interaction.editReply({
+            components: [createFightResultConfirmationRow(fight.id, true)],
+        });
+    } catch {
+        // If we can't edit, continue anyway
+    }
+
+    // Create ticket and send dispute message in background
     try {
         const ticketChannel = await createFightDisputeTicket(client, interaction.guild, interaction.member, fight);
 
@@ -105,7 +115,11 @@ async function handleDisputeAction(interaction, client, fight) {
         const disputeMessage = await sendDisputeMessage(interaction, fight);
         scheduleFightCleanup(interaction.message, [disputeMessage].filter(Boolean));
     } catch (error) {
-        await interaction.editReply({ embeds: [errorEmbed(error.message)] });
+        try {
+            await interaction.editReply({ embeds: [errorEmbed(error.message)] });
+        } catch {
+            // Interaction may have expired
+        }
     }
 }
 
@@ -195,7 +209,11 @@ export default {
                     const resultMessages = await sendResultMessages(interaction, winnerId, loserId);
                     scheduleFightCleanup(interaction.message, resultMessages);
                 } catch (payoutError) {
-                    await interaction.editReply({ embeds: [errorEmbed(payoutError.message)] });
+                    try {
+                        await interaction.editReply({ embeds: [errorEmbed(payoutError.message)] });
+                    } catch {
+                        // Interaction may have expired
+                    }
                 }
                 return;
             }
@@ -211,7 +229,11 @@ export default {
                     ]);
                     scheduleFightCleanup(interaction.message, loserMessages);
                 } catch (refundError) {
-                    await interaction.editReply({ embeds: [errorEmbed(refundError.message)] });
+                    try {
+                        await interaction.editReply({ embeds: [errorEmbed(refundError.message)] });
+                    } catch {
+                        // Interaction may have expired
+                    }
                 }
                 return;
             }
