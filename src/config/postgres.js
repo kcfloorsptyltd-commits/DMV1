@@ -75,7 +75,13 @@ export function resolveSslConfig() {
 
 export function resolvePostgresPoolConfig() {
     const ssl = resolveSslConfig();
-    const url = (process.env.POSTGRES_URL || process.env.DATABASE_URL || '').trim();
+
+    // Prefer DATABASE_URL (provided by Railway's Postgres service reference variable),
+    // then fall back to POSTGRES_URL, then assemble from individual variables.
+    const databaseUrl = (process.env.DATABASE_URL || '').trim();
+    const postgresUrl = (process.env.POSTGRES_URL || '').trim();
+    const url = databaseUrl || postgresUrl;
+
     const sharedOptions = {
         max: parseInt(process.env.POSTGRES_MAX_CONNECTIONS) || 20,
         min: parseInt(process.env.POSTGRES_MIN_CONNECTIONS) || 2,
@@ -89,21 +95,27 @@ export function resolvePostgresPoolConfig() {
     };
 
     if (url && url !== DEFAULT_POSTGRES_URL) {
+        const source = databaseUrl ? 'DATABASE_URL' : 'POSTGRES_URL';
+        console.log(`[postgres] Using connection string from ${source}`);
         return { connectionString: url, ...sharedOptions };
     }
 
+    const host = process.env.POSTGRES_HOST || 'localhost';
+    const database = process.env.POSTGRES_DB || 'titanbot';
+    const user = process.env.POSTGRES_USER || 'postgres';
+    console.log(`[postgres] Using individual connection variables — host=${host} db=${database} user=${user}`);
     return {
-        host: process.env.POSTGRES_HOST || 'localhost',
+        host,
         port: parseInt(process.env.POSTGRES_PORT) || 5432,
-        database: process.env.POSTGRES_DB || 'titanbot',
-        user: process.env.POSTGRES_USER || 'postgres',
+        database,
+        user,
         password: (process.env.POSTGRES_PASSWORD || '').toString(),
         ...sharedOptions,
     };
 }
 
 export const pgConfig = {
-    url: process.env.POSTGRES_URL || process.env.DATABASE_URL || DEFAULT_POSTGRES_URL,
+    url: process.env.DATABASE_URL || process.env.POSTGRES_URL || DEFAULT_POSTGRES_URL,
     
     options: {
         

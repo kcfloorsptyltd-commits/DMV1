@@ -31,11 +31,34 @@ class PostgreSQLDatabase {
         const multiplier = Number.isFinite(pgConfig.options.backoffMultiplier) ? pgConfig.options.backoffMultiplier : 2;
         const attempts = Math.max(1, retries + 1);
 
+        // Log which env vars are present to aid connection debugging (no passwords exposed)
+        const hasDatabaseUrl = !!(process.env.DATABASE_URL || '').trim();
+        const hasPostgresUrl = !!(process.env.POSTGRES_URL || '').trim();
+        const hasIndividualVars = !!(process.env.POSTGRES_HOST || process.env.POSTGRES_DB);
+        logger.info(
+            `[postgres] Connection env check — DATABASE_URL=${hasDatabaseUrl} POSTGRES_URL=${hasPostgresUrl} individual_vars=${hasIndividualVars}`
+        );
+
         for (let attempt = 1; attempt <= attempts; attempt += 1) {
             try {
                 await new Promise(resolve => setTimeout(resolve, 100));
 
-                this.pool = new pg.Pool(resolvePostgresPoolConfig());
+                const poolConfig = resolvePostgresPoolConfig();
+                // Log connection target without exposing credentials
+                if (poolConfig.connectionString) {
+                    try {
+                        const redacted = new URL(poolConfig.connectionString);
+                        redacted.password = '***';
+                        logger.info(`[postgres] Attempt ${attempt}/${attempts} — connecting via URL: ${redacted.toString()}`);
+                    } catch {
+                        logger.info(`[postgres] Attempt ${attempt}/${attempts} — connecting via connection string (URL parse failed)`);
+                    }
+                } else {
+                    logger.info(
+                        `[postgres] Attempt ${attempt}/${attempts} — connecting via host: ${poolConfig.host}:${poolConfig.port || 5432}/${poolConfig.database} user=${poolConfig.user}`
+                    );
+                }
+                this.pool = new pg.Pool(poolConfig);
 
                 this.pool.on('error', (error, client) => {
                     logger.error('PostgreSQL pool error:', error);
@@ -127,7 +150,7 @@ class PostgreSQLDatabase {
                     return false;
                 }
 
-                logger.warn(`PostgreSQL connection attempt ${attempt} failed: ${error.message}`);
+                logger.warn(`PostgreSQL connection attempt ${attempt}/${attempts} failed — code=${error.code || 'none'} message=${error.message || '(empty)'}`);
                 const backoff = Math.round(baseDelay * Math.pow(multiplier, attempt - 1));
                 await new Promise(resolve => setTimeout(resolve, backoff));
             }
