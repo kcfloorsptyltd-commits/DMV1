@@ -6,7 +6,7 @@ import { rateLimit } from 'express-rate-limit';
 import cron from 'node-cron';
 
 import config from './config/application.js';
-import { initializeDatabase } from './utils/database.js';
+import { initializeDatabase, verifyDataPersistence, logPersistenceSummary, exportAllData } from './utils/database.js';
 import { getGuildConfig } from './services/guildConfig.js';
 import { getServerCounters, saveServerCounters, updateCounter } from './services/serverstatsService.js';
 import { logger, startupLog, shutdownLog } from './utils/logger.js';
@@ -119,7 +119,23 @@ class TitanBot extends Client {
       } else {
         startupLog(`✅ Database Status: ${dbStatus.connectionType} (fully operational)`);
       }
-      
+
+      // Verify data persistence and log a per-table summary
+      startupLog('Verifying data persistence...');
+      try {
+        const persistenceCheck = await verifyDataPersistence();
+        if (persistenceCheck.ok && persistenceCheck.isPersistent) {
+          startupLog(`✅ All data persisting to ${persistenceCheck.backend.toUpperCase()}`);
+        } else if (persistenceCheck.isPersistent) {
+          startupLog(`⚠️  Data persisting to ${persistenceCheck.backend} — some tables unreachable`);
+        } else {
+          logger.warn(`⚠️  Data persistence WARNING: ${persistenceCheck.warning}`);
+        }
+        await logPersistenceSummary();
+      } catch (persistenceErr) {
+        logger.warn('Could not complete persistence verification:', persistenceErr?.message || persistenceErr);
+      }
+
       startupLog('Starting web server...');
       this.startWebServer();
       
@@ -291,10 +307,59 @@ class TitanBot extends Client {
         database: {
           connected: dbStatus.connectionType !== 'none',
           degraded: dbStatus.isDegraded,
-          type: dbStatus.connectionType
+          type: dbStatus.connectionType,
+          backendLabel: dbStatus.backendLabel ?? dbStatus.connectionType,
+          persistent: dbStatus.connectionType !== 'memory',
         }
       };
       res.status(200).json(status);
+    });
+
+    // Detailed data-persistence status endpoint
+    app.get('/persistence', async (req, res) => {
+      try {
+        const { getDataPersistenceStatus: getPersistenceStatus, verifyDataPersistence: verifyPersistence } = await import('./utils/database.js');
+        const [persistenceStatus, verification] = await Promise.all([
+          getPersistenceStatus(),
+          verifyPersistence(),
+        ]);
+
+        const httpStatus = verification.isPersistent ? 200 : 503;
+        res.status(httpStatus).json({
+          ok: verification.ok,
+          backend: persistenceStatus.backend,
+          isPersistent: persistenceStatus.isPersistent,
+          warning: verification.warning ?? null,
+          tables: verification.tables,
+          dataTypes: persistenceStatus.dataTypes,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (err) {
+        logger.error('[persistence endpoint] Error:', err);
+        res.status(500).json({ ok: false, error: 'Failed to retrieve persistence status' });
+      }
+    });
+
+    // Manual data export endpoint (protected by bot token header)
+    app.get('/persistence/export', async (req, res) => {
+      const authHeader = req.headers['authorization'] || '';
+      const expectedToken = this.config.api?.pvpEvent?.token || process.env.API_TOKEN;
+
+      if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      try {
+        const { exportAllData: doExport } = await import('./utils/database.js');
+        const snapshot = await doExport();
+        if (!snapshot) {
+          return res.status(503).json({ error: 'PostgreSQL not available — export not possible' });
+        }
+        res.status(200).json(snapshot);
+      } catch (err) {
+        logger.error('[persistence export endpoint] Error:', err);
+        res.status(500).json({ error: 'Export failed' });
+      }
     });
 
     app.get('/ready', (req, res) => {
@@ -342,8 +407,9 @@ class TitanBot extends Client {
         hasStartedListening = true;
         this.webServer = server;
         startupLog(`✅ Web Server running on ${host}:${port}`);
-        startupLog(`Health endpoint: http://${host}:${port}/health`);
-        startupLog(`Ready endpoint: http://${host}:${port}/ready`);
+        startupLog(`Health endpoint:       http://${host}:${port}/health`);
+        startupLog(`Ready endpoint:        http://${host}:${port}/ready`);
+        startupLog(`Persistence endpoint:  http://${host}:${port}/persistence`);
       });
 
       server.on('error', (error) => {

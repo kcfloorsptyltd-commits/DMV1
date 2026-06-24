@@ -152,12 +152,46 @@ class DatabaseWrapper {
         return true;
     }
 
+    /**
+     * Returns true when the bot is running in degraded (non-persistent) mode.
+     * Convenience alias used by several modules.
+     */
+    isDegraded() {
+        return this.connectionType === 'memory';
+    }
+
+    /**
+     * Returns a structured status object describing the current storage backend.
+     * Includes a human-readable `backendLabel` for logging and health endpoints.
+     */
     getStatus() {
+        const backendLabels = {
+            postgresql: 'PostgreSQL (persistent)',
+            sqlite:     'SQLite (local persistent)',
+            memory:     'In-Memory (non-persistent ⚠️)',
+            none:       'Not initialized',
+        };
+
         return {
             isDegraded: this.connectionType === 'memory',
             connectionType: this.connectionType,
+            backendLabel: backendLabels[this.connectionType] ?? this.connectionType,
             degradedReason: this.degradedReason,
         };
+    }
+
+    /**
+     * Returns a one-line string describing the active storage backend.
+     * Useful for startup log lines.
+     */
+    getBackendDescription() {
+        if (!this.initialized) return 'not initialized';
+        switch (this.connectionType) {
+            case 'postgresql': return 'PostgreSQL — data persists across redeployments ✅';
+            case 'sqlite':     return 'SQLite — data persists locally ⚠️ (not shared across instances)';
+            case 'memory':     return 'In-Memory — data is LOST on restart ❌';
+            default:           return this.connectionType;
+        }
     }
 }
 
