@@ -23,6 +23,12 @@ function getFightPayouts(fight) {
     };
 }
 
+function getConfirmationEmoji(confirmation) {
+    if (confirmation === 'won') return '✅ I Won';
+    if (confirmation === 'lost') return '❌ I Lost';
+    return '⏳ Pending';
+}
+
 export function getFightResolutionLabel(fight) {
     switch (fight?.disputeResolution) {
     case 'pay_challenger':
@@ -206,8 +212,8 @@ export function createFightResultWaitingEmbed(fight, waitingForId) {
         fields: [
             { name: 'Fight ID', value: fight.id, inline: true },
             { name: 'Pot', value: formatCurrency(fight.amount * 2, { short: true }), inline: true },
-            { name: `<@${fight.challenger_id}> submitted`, value: fight.challengerConfirmed ?? 'pending', inline: true },
-            { name: `<@${fight.opponent_id}> submitted`, value: fight.opponentConfirmed ?? 'pending', inline: true },
+            { name: `<@${fight.challenger_id}> said`, value: getConfirmationEmoji(fight.challengerConfirmed), inline: true },
+            { name: `<@${fight.opponent_id}> said`, value: getConfirmationEmoji(fight.opponentConfirmed), inline: true },
         ],
         footer: 'Click ✅ I Won, ❌ I Lost, or 🚨 Dispute to report your result',
     });
@@ -282,8 +288,8 @@ export function createFightDisputeEmbed(fight, ticketChannelId) {
         fields: [
             { name: 'Fight ID', value: fight.id, inline: true },
             { name: 'Escrowed Pot', value: formatCurrency(fight.amount * 2, { short: true }), inline: true },
-            { name: 'Challenger', value: `<@${fight.challenger_id}> (${fight.challengerOsrsUsername || 'Unknown'})`, inline: false },
-            { name: 'Opponent', value: `<@${fight.opponent_id}> (${fight.opponentOsrsUsername || 'Unknown'})`, inline: false },
+            { name: `<@${fight.challenger_id}> said`, value: getConfirmationEmoji(fight.challengerConfirmed), inline: true },
+            { name: `<@${fight.opponent_id}> said`, value: getConfirmationEmoji(fight.opponentConfirmed), inline: true },
         ],
     });
 }
