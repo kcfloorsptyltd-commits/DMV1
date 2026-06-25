@@ -21,6 +21,7 @@ const PUBLIC_COMMANDS = new Set([
     'trade',
     'balance',
     'profile',
+    'unlock',
 ]);
 
 function getSubcommandInfo(commandData) {

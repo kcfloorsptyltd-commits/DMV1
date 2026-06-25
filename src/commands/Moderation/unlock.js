@@ -1,20 +1,31 @@
-import { SlashCommandBuilder, PermissionFlagsBits, PermissionsBitField, ChannelType } from 'discord.js';
-import { createEmbed, successEmbed, infoEmbed, warningEmbed } from '../../utils/embeds.js';
+import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
+import { errorEmbed, successEmbed } from '../../utils/embeds.js';
 import { logEvent } from '../../utils/moderation.js';
 import { logger } from '../../utils/logger.js';
-import { getColor } from '../../config/bot.js';
-
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { getOsrsAdminPermissionError, isAuthorizedOsrsAdmin } from '../../utils/osrsAdminAuth.js';
+import { unlockVaultForce } from '../../utils/vaultSystem.js';
+import { logBalanceTransaction } from '../../utils/fundsTracking.js';
+
 export default {
     data: new SlashCommandBuilder()
-        .setName("unlock")
-        .setDescription(
-            "Unlocks the current channel (allows @everyone to send messages again).",
+        .setName('unlock')
+        .setDescription('Unlock the current channel or force-release a player vault.')
+        .addUserOption((option) =>
+            option
+                .setName('user')
+                .setDescription('Player whose vault should be unlocked')
+                .setRequired(false),
         )
-.setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
-    category: "moderation",
+        .addStringOption((option) =>
+            option
+                .setName('guild')
+                .setDescription('Optional guild ID for the target vault')
+                .setRequired(false),
+        ),
+    category: 'moderation',
 
-    async execute(interaction, config, client) {
+    async execute(interaction, _config, client) {
         const deferSuccess = await InteractionHelper.safeDefer(interaction);
         if (!deferSuccess) {
             logger.warn(`Unlock interaction defer failed`, {
@@ -25,10 +36,78 @@ export default {
             return;
         }
 
-        const channel = interaction.channel;
-        const everyoneRole = interaction.guild.roles.everyone;
+        const targetUser = interaction.options.getUser('user');
 
         try {
+            if (targetUser) {
+                const allowed = await isAuthorizedOsrsAdmin(interaction, client);
+                if (!allowed) {
+                    await InteractionHelper.safeEditReply(interaction, {
+                        embeds: [errorEmbed(getOsrsAdminPermissionError('unlock player vaults'))],
+                    });
+                    return;
+                }
+
+                if (!client.db || typeof client.db.isAvailable !== 'function' || !client.db.isAvailable()) {
+                    await InteractionHelper.safeEditReply(interaction, {
+                        embeds: [errorEmbed('Database is degraded — write operations are disabled right now.')],
+                    });
+                    return;
+                }
+
+                const targetGuildId = interaction.options.getString('guild') || interaction.guildId;
+                const result = await unlockVaultForce(client, targetUser.id, targetGuildId);
+
+                if (!result.success) {
+                    await InteractionHelper.safeEditReply(interaction, {
+                        embeds: [errorEmbed(result.error || 'That player does not have an active vault.')],
+                    });
+                    return;
+                }
+
+                await logBalanceTransaction(client, targetGuildId, {
+                    type: 'add',
+                    targetUserId: targetUser.id,
+                    targetUsername: targetUser.tag,
+                    amount: result.amount,
+                    balanceBefore: result.walletBefore,
+                    balanceAfter: result.walletAfter,
+                    balanceType: 'wallet',
+                    requestedBy: interaction.user.id,
+                    requestedByTag: interaction.user.tag,
+                    timestamp: new Date(),
+                });
+
+                logger.info('[VAULT] Admin unlock executed', {
+                    guildId: targetGuildId,
+                    adminId: interaction.user.id,
+                    targetUserId: targetUser.id,
+                    amount: result.amount,
+                });
+
+                await InteractionHelper.safeEditReply(interaction, {
+                    embeds: [
+                        successEmbed(
+                            '🔓 Vault Unlocked',
+                            `Vault unlocked for ${targetUser} (${result.amount.toLocaleString()} gp released)`,
+                        ),
+                    ],
+                });
+                return;
+            }
+
+            const allowed = interaction.member.permissions?.has(PermissionFlagsBits.ManageChannels)
+                || await isAuthorizedOsrsAdmin(interaction, client);
+
+            if (!allowed) {
+                await InteractionHelper.safeEditReply(interaction, {
+                    embeds: [errorEmbed('You do not have permission to unlock this channel.')],
+                });
+                return;
+            }
+
+            const channel = interaction.channel;
+            const everyoneRole = interaction.guild.roles.everyone;
             const currentPermissions = channel.permissionsFor(everyoneRole);
             if (
                 currentPermissions.has(PermissionFlagsBits.SendMessages) ===
@@ -36,7 +115,10 @@ export default {
                 currentPermissions.has(PermissionFlagsBits.SendMessages) ===
                     null
             ) {
-                return await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: '${channel} is not explicitly locked (everyone can already send messages).' });
+                await InteractionHelper.safeEditReply(interaction, {
+                    embeds: [errorEmbed(`${channel} is not explicitly locked (everyone can already send messages).`)],
+                });
+                return;
             }
 
             await channel.permissionOverwrites.edit(
@@ -48,36 +130,18 @@ export default {
 },
             );
 
-            const unlockEmbed = createEmbed(
-                "🔓 Channel Unlocked (Action Log)",
-                `${channel} has been unlocked by ${interaction.user}.`,
-            )
-.setColor(getColor('success'))
-                .addFields(
-                    {
-                        name: "Channel",
-                        value: channel.toString(),
-                        inline: true,
-                    },
-                    {
-                        name: "Moderator",
-                        value: `${interaction.user.tag} (${interaction.user.id})`,
-                        inline: true,
-                    },
-                );
-
             await logEvent({
                 client,
                 guild: interaction.guild,
                 event: {
-                    action: "Channel Unlocked",
+                    action: 'Channel Unlocked',
                     target: channel.toString(),
                     executor: `${interaction.user.tag} (${interaction.user.id})`,
                     metadata: {
                         channelId: channel.id,
-                        category: channel.parent?.name || 'None'
-                    }
-                }
+                        category: channel.parent?.name || 'None',
+                    },
+                },
             });
 
             await InteractionHelper.safeEditReply(interaction, {
@@ -90,7 +154,9 @@ export default {
             });
         } catch (error) {
             logger.error('Unlock command error:', error);
-            await replyUserError(interaction, { type: ErrorTypes.PERMISSION, message: 'An unexpected error occurred while trying to unlock the channel. Check my permissions (I need \'Manage Channels\').' });
+            await InteractionHelper.safeEditReply(interaction, {
+                embeds: [errorEmbed('An unexpected error occurred while trying to unlock this target. Check my permissions and try again.')],
+            });
         }
     }
 };

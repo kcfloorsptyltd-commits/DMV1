@@ -91,6 +91,38 @@ export function formatProfileCurrency(amount) {
     return `${formatted} gp`;
 }
 
+export function formatVaultTimeRemaining(remainingMs) {
+    const ms = Math.max(0, Number(remainingMs) || 0);
+    const minutes = Math.floor(ms / (60 * 1000));
+
+    if (minutes < 60) {
+        const visibleMinutes = Math.max(1, minutes);
+        return `${visibleMinutes} min remaining`;
+    }
+
+    const hours = Math.floor(ms / (60 * 60 * 1000));
+    if (hours < 24) {
+        return `${hours} hour${hours === 1 ? '' : 's'} remaining`;
+    }
+
+    const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+    return `${days} day${days === 1 ? '' : 's'} remaining`;
+}
+
+export function formatVaultStatusText(vault, options = {}) {
+    if (options.justReleased) {
+        return 'Released!';
+    }
+
+    if (!vault || !Number.isFinite(Number(vault.amount)) || Number(vault.amount) <= 0) {
+        return 'Empty';
+    }
+
+    const referenceTime = options.now instanceof Date ? options.now.getTime() : Date.now();
+    const remainingMs = new Date(vault.lockedUntil).getTime() - referenceTime;
+    return `${formatProfileCurrency(vault.amount)} (${formatVaultTimeRemaining(remainingMs)})`;
+}
+
 export function buildLinkedRsnsValue(usernames) {
     if (!Array.isArray(usernames) || usernames.length === 0) {
         return 'No linked OSRS accounts yet.';

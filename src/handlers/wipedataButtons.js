@@ -36,6 +36,7 @@ const wipedataConfirmHandler = {
         `lastWork:${guildId}:${userId}`,
         `lastCrime:${guildId}:${userId}`,
         `lastRob:${guildId}:${userId}`,
+        `vault:${userId}:${guildId}`,
       ];
 
       let deletedCount = 0;

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   normalizeLinkedOsrsUsernames,
   formatProfileCurrency,
+  formatVaultStatusText,
   buildLinkedRsnsValue,
   buildFightStats,
   buildRecentActivityRows,
@@ -31,6 +32,23 @@ test('buildLinkedRsnsValue renders compact emoji rows', () => {
   assert.equal(
     buildLinkedRsnsValue(['Main PKer', 'Alt Pure']),
     '🟢 Main PKer\n🔹 Alt Pure',
+  );
+});
+
+test('formatVaultStatusText renders empty, released, and locked states', () => {
+  const referenceNow = new Date('2026-06-25T03:30:00.000Z');
+
+  assert.equal(formatVaultStatusText(null), 'Empty');
+  assert.equal(formatVaultStatusText(null, { justReleased: true }), 'Released!');
+  assert.equal(
+    formatVaultStatusText(
+      {
+        amount: 100_000,
+        lockedUntil: '2026-06-25T04:29:00.000Z',
+      },
+      { now: referenceNow },
+    ),
+    '100K gp (59 min remaining)',
   );
 });
 
