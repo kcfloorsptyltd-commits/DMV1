@@ -28,6 +28,16 @@ export default {
           content: '❌ Invalid category selected. Please try again.',
           components: [],
         });
+        
+        // Delete error message after 10 seconds
+        setTimeout(async () => {
+          try {
+            await interaction.deleteReply();
+          } catch (error) {
+            logger.debug('Message already deleted or expired');
+          }
+        }, 10000);
+        
         return;
       }
 
@@ -49,11 +59,29 @@ export default {
           content: `✅ Ticket created for **${category.emoji} ${category.label}**! Jump to it: ${channelMention}`,
           components: [],
         });
+        
+        // Delete success message after 10 seconds
+        setTimeout(async () => {
+          try {
+            await interaction.deleteReply();
+          } catch (error) {
+            logger.debug('Message already deleted or expired');
+          }
+        }, 10000);
       } else {
         await interaction.editReply({
           content: `❌ ${result.error || 'Failed to create ticket.'}`,
           components: [],
         });
+        
+        // Delete error message after 10 seconds
+        setTimeout(async () => {
+          try {
+            await interaction.deleteReply();
+          } catch (error) {
+            logger.debug('Message already deleted or expired');
+          }
+        }, 10000);
       }
     } catch (error) {
       logger.error('Error in ticket category select:', error);
@@ -65,6 +93,15 @@ export default {
             content: '❌ An error occurred while creating your ticket.',
             components: [],
           });
+          
+          // Delete error message after 10 seconds
+          setTimeout(async () => {
+            try {
+              await interaction.deleteReply();
+            } catch (error) {
+              logger.debug('Message already deleted or expired');
+            }
+          }, 10000);
         }
       } catch (replyError) {
         logger.error('Failed to send ticket category select error response:', replyError);
