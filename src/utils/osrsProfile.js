@@ -123,6 +123,29 @@ export function formatVaultStatusText(vault, options = {}) {
     return `${formatProfileCurrency(vault.amount)} (${formatVaultTimeRemaining(remainingMs)})`;
 }
 
+export function formatAllVaultsText(vaults, options = {}) {
+    if (!Array.isArray(vaults) || vaults.length === 0) {
+        return 'No active vaults.';
+    }
+
+    const referenceTime = options.now instanceof Date ? options.now.getTime() : Date.now();
+    const activeVaults = vaults.filter((v) => new Date(v.lockedUntil).getTime() > referenceTime);
+
+    if (activeVaults.length === 0) {
+        return 'No active vaults.';
+    }
+
+    const lines = activeVaults.map((vault, index) => {
+        const remainingMs = new Date(vault.lockedUntil).getTime() - referenceTime;
+        return `🔐 Vault #${index + 1}: ${formatProfileCurrency(vault.amount)} (${formatVaultTimeRemaining(remainingMs)})`;
+    });
+
+    const total = activeVaults.reduce((sum, v) => sum + v.amount, 0);
+    lines.push(`**Total locked:** ${formatProfileCurrency(total)}`);
+
+    return lines.join('\n');
+}
+
 export function buildLinkedRsnsValue(usernames) {
     if (!Array.isArray(usernames) || usernames.length === 0) {
         return 'No linked OSRS accounts yet.';

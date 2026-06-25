@@ -1,11 +1,12 @@
-import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits, ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
 import { errorEmbed, successEmbed } from '../../utils/embeds.js';
 import { logEvent } from '../../utils/moderation.js';
 import { logger } from '../../utils/logger.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { getOsrsAdminPermissionError, isAuthorizedOsrsAdmin } from '../../utils/osrsAdminAuth.js';
-import { unlockVaultForce } from '../../utils/vaultSystem.js';
+import { getAllVaults, unlockVaultForce } from '../../utils/vaultSystem.js';
 import { logBalanceTransaction } from '../../utils/fundsTracking.js';
+import { formatProfileCurrency, formatVaultTimeRemaining } from '../../utils/osrsProfile.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -56,42 +57,90 @@ export default {
                 }
 
                 const targetGuildId = interaction.options.getString('guild') || interaction.guildId;
-                const result = await unlockVaultForce(client, targetUser.id, targetGuildId);
+                const vaults = await getAllVaults(client, targetUser.id, targetGuildId);
 
-                if (!result.success) {
+                if (vaults.length === 0) {
                     await InteractionHelper.safeEditReply(interaction, {
-                        embeds: [errorEmbed(result.error || 'That player does not have an active vault.')],
+                        embeds: [errorEmbed('User has no active vaults.')],
                     });
                     return;
                 }
 
-                await logBalanceTransaction(client, targetGuildId, {
-                    type: 'add',
-                    targetUserId: targetUser.id,
-                    targetUsername: targetUser.tag,
-                    amount: result.amount,
-                    balanceBefore: result.walletBefore,
-                    balanceAfter: result.walletAfter,
-                    balanceType: 'wallet',
-                    requestedBy: interaction.user.id,
-                    requestedByTag: interaction.user.tag,
-                    timestamp: new Date(),
-                });
+                // Single vault — unlock directly
+                if (vaults.length === 1) {
+                    const result = await unlockVaultForce(client, targetUser.id, targetGuildId, vaults[0].id);
 
-                logger.info('[VAULT] Admin unlock executed', {
-                    guildId: targetGuildId,
-                    adminId: interaction.user.id,
-                    targetUserId: targetUser.id,
-                    amount: result.amount,
-                });
+                    if (!result.success) {
+                        await InteractionHelper.safeEditReply(interaction, {
+                            embeds: [errorEmbed(result.error || 'That player does not have an active vault.')],
+                        });
+                        return;
+                    }
+
+                    await logBalanceTransaction(client, targetGuildId, {
+                        type: 'add',
+                        targetUserId: targetUser.id,
+                        targetUsername: targetUser.tag,
+                        amount: result.amount,
+                        balanceBefore: result.walletBefore,
+                        balanceAfter: result.walletAfter,
+                        balanceType: 'wallet',
+                        requestedBy: interaction.user.id,
+                        requestedByTag: interaction.user.tag,
+                        timestamp: new Date(),
+                    });
+
+                    logger.info('[VAULT] Admin unlock executed', {
+                        guildId: targetGuildId,
+                        adminId: interaction.user.id,
+                        targetUserId: targetUser.id,
+                        amount: result.amount,
+                    });
+
+                    await InteractionHelper.safeEditReply(interaction, {
+                        embeds: [
+                            successEmbed(
+                                '🔓 Vault Unlocked',
+                                `Vault unlocked for ${targetUser} (${result.amount.toLocaleString()} gp released)`,
+                            ),
+                        ],
+                    });
+                    return;
+                }
+
+                // Multiple vaults — show select menu (active only)
+                const now = Date.now();
+                const activeVaults = vaults.filter((v) => now < new Date(v.lockedUntil).getTime());
+
+                if (activeVaults.length === 0) {
+                    await InteractionHelper.safeEditReply(interaction, {
+                        embeds: [errorEmbed('User has no active vaults.')],
+                    });
+                    return;
+                }
+
+                const select = new StringSelectMenuBuilder()
+                    .setCustomId(`vault_unlock_select:${targetUser.id}:${targetGuildId}`)
+                    .setPlaceholder('Select a vault to unlock')
+                    .addOptions(
+                        activeVaults.map((vault, index) => {
+                            const remainingMs = new Date(vault.lockedUntil).getTime() - now;
+                            const label = `Vault #${index + 1} — ${formatProfileCurrency(vault.amount)} (${formatVaultTimeRemaining(remainingMs)})`;
+                            return {
+                                label: label.slice(0, 100),
+                                value: vault.id,
+                            };
+                        }),
+                    );
 
                 await InteractionHelper.safeEditReply(interaction, {
                     embeds: [
                         successEmbed(
-                            '🔓 Vault Unlocked',
-                            `Vault unlocked for ${targetUser} (${result.amount.toLocaleString()} gp released)`,
+                            '🔐 Select Vault to Unlock',
+                            `${targetUser} has **${activeVaults.length}** active vaults. Select one to unlock:`,
                         ),
                     ],
+                    components: [new ActionRowBuilder().addComponents(select)],
                 });
                 return;
             }
