@@ -15,6 +15,7 @@ import {
     MessageFlags,
     ComponentType,
     EmbedBuilder,
+    Colors,
 } from 'discord.js';
 import { InteractionHelper } from '../../../utils/interactionHelper.js';
 import { successEmbed, infoEmbed } from '../../../utils/embeds.js';
@@ -82,9 +83,17 @@ async function persistPanelMessageId(client, guildId, guildConfig, messageId) {
 
 function buildPanelEmbed(config) {
     return new EmbedBuilder()
-        .setTitle('Support Tickets')
-        .setDescription(config.ticketPanelMessage || 'Click the button below to create a support ticket.')
-        .setColor(getColor('info'));
+        .setTitle('🎫 SUPPORT & SERVICES TICKET 🎫')
+        .setDescription(config.ticketPanelMessage || 'Need assistance? You\'re in the right place!')
+        .addFields(
+            {
+                name: 'Please open a ticket for any of the following:',
+                value: '💰 Gold Deposits\n💰 Gold Withdrawals\n🎮 In-Game GP Purchases\n📋 Account & Balance Enquiries\n🏰 Clan Chat Access\n🏅 Rank Purchases\n❓ General Questions & Support\n📬 Any Other Requests',
+                inline: false,
+            }
+        )
+        .setColor(0xB8860B) // Dark gold/medieval color
+        .setFooter({ text: 'WE\'RE HERE TO HELP. ALWAYS.' });
 }
 
 function buildPanelButtonRow(config) {
@@ -92,8 +101,8 @@ function buildPanelButtonRow(config) {
         new ButtonBuilder()
             .setCustomId('create_ticket')
             .setLabel(config.ticketButtonLabel || 'Create Ticket')
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji('📩'),
+            .setStyle(ButtonStyle.Danger) // Red/dark style
+            .setEmoji('📬'),
     );
 }
 
@@ -136,7 +145,7 @@ function buildDashboardEmbed(config, guild, panelStatus = null, ticketStats = nu
     const closedCategoryChannel = config.ticketClosedCategoryId ? guild.channels.cache.get(config.ticketClosedCategoryId) : null;
     const closedCategory = closedCategoryChannel ? closedCategoryChannel.toString() : '`Not set`';
 
-    const rawMsg = config.ticketPanelMessage || 'Click the button below to create a support ticket.';
+    const rawMsg = config.ticketPanelMessage || 'Need assistance? You\'re in the right place!';
     const panelMsg = `\`${rawMsg.length > 60 ? rawMsg.substring(0, 60) + '…' : rawMsg}\``;
     const btnLabel = `\`${config.ticketButtonLabel || 'Create Ticket'}\``;
 
@@ -356,12 +365,12 @@ async function handlePanelMessage(selectInteraction, rootInteraction, guildConfi
                     .setStyle(TextInputStyle.Paragraph)
                     .setValue(
                         guildConfig.ticketPanelMessage ||
-                            'Click the button below to create a support ticket.',
+                            'Need assistance? You\'re in the right place!',
                     )
                     .setMaxLength(2000)
                     .setMinLength(1)
                     .setRequired(true)
-                    .setPlaceholder('Click the button below to create a support ticket.'),
+                    .setPlaceholder('Need assistance? You\'re in the right place!'),
             ),
         );
 
