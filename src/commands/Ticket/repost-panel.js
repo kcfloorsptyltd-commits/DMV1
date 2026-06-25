@@ -1,10 +1,10 @@
-import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { successEmbed, errorEmbed } from '../../utils/embeds.js';
 import { logger } from '../../utils/logger.js';
 import { handleInteractionError, replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { getGuildConfig } from '../../services/guildConfig.js';
-import { getTicketPanelStatus } from '../../utils/panelStatus.js';
+import { getGuildConfigKey } from '../../utils/database.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -75,7 +75,7 @@ export default {
 
             // Update config with new message ID
             guildConfig.ticketPanelMessageId = sentMessage.id;
-            await client.db.set(`guild_${interaction.guildId}`, guildConfig);
+            await client.db.set(getGuildConfigKey(interaction.guildId), guildConfig);
 
             await InteractionHelper.safeEditReply(interaction, {
                 embeds: [
@@ -121,17 +121,16 @@ function buildPanelEmbed(config) {
                 inline: false,
             }
         )
-        .setColor(0xB8860B) // Dark gold/medieval color
+        .setColor(0xB8860B)
         .setFooter({ text: 'WE\'RE HERE TO HELP. ALWAYS.' });
 }
 
 function buildPanelButtonRow(config) {
-    const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('create_ticket')
             .setLabel(config.ticketButtonLabel || 'Create Ticket')
-            .setStyle(ButtonStyle.Danger) // Red/dark style
+            .setStyle(ButtonStyle.Danger)
             .setEmoji('📬'),
     );
 }
