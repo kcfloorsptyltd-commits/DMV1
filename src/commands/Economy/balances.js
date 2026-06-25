@@ -45,8 +45,8 @@ function buildLeaderboardEmbed(balances, page = 1) {
         .setColor(0xB8860B); // Dark gold
 
     // Add top 3 special cards at the top (only on first page)
-    if (page === 1) {
-        const topThree = balances.slice(0, 3);
+    if (page === 1 && balances.length > 0) {
+        const topThree = balances.slice(0, Math.min(3, balances.length));
         let topSection = '';
 
         topThree.forEach((balance, idx) => {
@@ -173,7 +173,12 @@ export default {
             const guildId = interaction.guildId;
 
             // Get all guild members
-            await interaction.guild.members.fetch().catch(() => null);
+            try {
+                await interaction.guild.members.fetch().catch(() => null);
+            } catch (fetchErr) {
+                logger.warn('Failed to fetch guild members:', fetchErr.message);
+            }
+            
             const members = interaction.guild.members.cache;
 
             if (members.size === 0) {
@@ -190,9 +195,9 @@ export default {
 
                 try {
                     const economyKey = `economy:${guildId}:${member.id}`;
-                    const userData = await client.db.get(economyKey, null);
+                    const userData = await client.db.get(economyKey).catch(() => null);
                     
-                    if (userData) {
+                    if (userData && userData.wallet !== undefined) {
                         const wallet = userData.wallet || 0;
                         balances.push({
                             userId: member.id,
@@ -264,7 +269,7 @@ export default {
             // Send initial message
             const message = await InteractionHelper.safeEditReply(interaction, {
                 embeds: [leaderboardEmbeds[0]],
-                components: totalPages > 1 ? [buttons] : [buttons]
+                components: [buttons]
             });
 
             if (!message) return;
