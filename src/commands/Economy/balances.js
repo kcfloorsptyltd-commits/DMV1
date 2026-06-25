@@ -38,13 +38,12 @@ function buildLeaderboardEmbed(balances, page = 1) {
     const start = (page - 1) * ENTRIES_PER_PAGE;
     const pageBalances = balances.slice(start, start + ENTRIES_PER_PAGE);
 
-    const maxBalance = balances[0]?.total || 1; // For progress bar scaling
+    const maxBalance = balances[0]?.total || 1;
 
     const embed = new EmbedBuilder()
         .setTitle('💎 ═══ WEALTH LEADERBOARD ═══ 💎')
-        .setColor(0xB8860B); // Dark gold
+        .setColor(0xB8860B);
 
-    // Add top 3 special cards at the top (only on first page)
     if (page === 1 && balances.length > 0) {
         const topThree = balances.slice(0, Math.min(3, balances.length));
         let topSection = '';
@@ -64,7 +63,6 @@ function buildLeaderboardEmbed(balances, page = 1) {
         });
     }
 
-    // Main leaderboard section
     let leaderboardText = '```\n';
     leaderboardText += 'RANK  NAME                 WALLET       TOTAL\n';
     leaderboardText += '──────────────────────────────────────────────────\n';
@@ -86,7 +84,6 @@ function buildLeaderboardEmbed(balances, page = 1) {
         inline: false
     });
 
-    // Stats footer
     const pageStart = start + 1;
     const pageEnd = Math.min(start + ENTRIES_PER_PAGE, balances.length);
 
@@ -157,7 +154,6 @@ export default {
             const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
             if (!deferred) return;
 
-            // Check permissions
             const hasPermission = 
                 interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
                 interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) ||
@@ -172,7 +168,6 @@ export default {
 
             const guildId = interaction.guildId;
 
-            // Get all guild members
             try {
                 await interaction.guild.members.fetch().catch(() => null);
             } catch (fetchErr) {
@@ -187,42 +182,55 @@ export default {
                 });
             }
 
-            // Fetch all balances
             const balances = [];
+            let processedCount = 0;
+            let errorCount = 0;
+
+            logger.debug(`[BALANCES] Starting to fetch data for ${members.size} members`);
 
             for (const member of members.values()) {
-                if (member.user.bot) continue; // Skip bots
+                if (member.user.bot) continue;
 
                 try {
                     const economyKey = `economy:${guildId}:${member.id}`;
-                    const userData = await client.db.get(economyKey).catch(() => null);
                     
-                    if (userData && userData.wallet !== undefined) {
-                        const wallet = userData.wallet || 0;
-                        balances.push({
-                            userId: member.id,
-                            username: member.user.username,
-                            displayName: member.displayName,
-                            wallet: wallet,
-                            bank: userData.bank || 0,
-                            total: wallet + (userData.bank || 0)
-                        });
+                    // Use the proper database call pattern with default value
+                    const userData = await client.db.get(economyKey, null);
+                    
+                    processedCount++;
+
+                    // Only add if userData exists and has wallet data
+                    if (userData && typeof userData === 'object') {
+                        const wallet = Number(userData.wallet) || 0;
+                        const bank = Number(userData.bank) || 0;
+                        
+                        if (wallet > 0 || bank > 0) {
+                            balances.push({
+                                userId: member.id,
+                                username: member.user.username,
+                                displayName: member.displayName,
+                                wallet: wallet,
+                                bank: bank,
+                                total: wallet + bank
+                            });
+                        }
                     }
                 } catch (err) {
+                    errorCount++;
                     logger.debug(`Failed to fetch balance for ${member.id}:`, err.message);
                 }
             }
 
+            logger.debug(`[BALANCES] Processed ${processedCount} members, ${errorCount} errors, ${balances.length} with balances`);
+
             if (balances.length === 0) {
                 return await InteractionHelper.safeEditReply(interaction, {
-                    embeds: [infoEmbed('No Balance Data', 'No members have balance data yet.')]
+                    embeds: [infoEmbed('No Balance Data', 'No members have balance data yet. They need to earn some first!')]
                 });
             }
 
-            // Sort by total balance (highest to lowest)
             balances.sort((a, b) => b.total - a.total);
 
-            // Build embeds
             const leaderboardEmbeds = [];
             const totalPages = Math.ceil(balances.length / ENTRIES_PER_PAGE);
 
@@ -232,7 +240,6 @@ export default {
 
             const statsEmbed = buildStatsEmbed(balances);
 
-            // Create pagination buttons
             const buttons = new ActionRowBuilder();
 
             if (totalPages > 1) {
@@ -266,7 +273,6 @@ export default {
                 );
             }
 
-            // Send initial message
             const message = await InteractionHelper.safeEditReply(interaction, {
                 embeds: [leaderboardEmbeds[0]],
                 components: [buttons]
@@ -274,10 +280,9 @@ export default {
 
             if (!message) return;
 
-            // Create button collector
             const collector = message.createMessageComponentCollector({
                 filter: i => i.user.id === interaction.user.id,
-                time: 5 * 60 * 1000 // 5 minutes
+                time: 5 * 60 * 1000
             });
 
             let currentPage = 1;
@@ -305,7 +310,6 @@ export default {
                         currentPage = 1;
                     }
 
-                    // Update buttons
                     const updatedButtons = new ActionRowBuilder().addComponents(
                         new ButtonBuilder()
                             .setCustomId('leaderboard_prev')
@@ -345,7 +349,8 @@ export default {
                 userId: interaction.user.id,
                 guildId: guildId,
                 memberCount: balances.length,
-                pages: totalPages
+                pages: totalPages,
+                processedMembers: processedCount
             });
 
         } catch (error) {
@@ -358,7 +363,7 @@ export default {
 
             await replyUserError(interaction, {
                 type: ErrorTypes.UNKNOWN,
-                message: 'Failed to fetch balance leaderboard. Please try again later.'
+                message: `Failed to fetch balance leaderboard: ${error.message}`
             }).catch(() => {});
         }
     }
