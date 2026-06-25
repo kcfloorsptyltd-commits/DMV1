@@ -1,4 +1,4 @@
-import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, MessageFlags } from 'discord.js';
+import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder, AttachmentBuilder, MessageFlags } from 'discord.js';
 import { createEmbed, successEmbed } from '../utils/embeds.js';
 import { createTicket, closeTicket, claimTicket, updateTicketPriority } from '../services/ticket.js';
 import { getGuildConfig } from '../services/guildConfig.js';
@@ -8,6 +8,17 @@ import { InteractionHelper } from '../utils/interactionHelper.js';
 import { checkRateLimit } from '../utils/rateLimiter.js';
 import { replyUserError, ErrorTypes } from '../utils/errorHandler.js';
 import { getTicketPermissionContext } from '../utils/ticketPermissions.js';
+
+export const TICKET_CATEGORIES = [
+  { value: 'gold_deposits',    label: 'Gold Deposits',                  emoji: '💰' },
+  { value: 'gold_withdrawals', label: 'Gold Withdrawals',               emoji: '💰' },
+  { value: 'in_game_gp',       label: 'In-Game GP Purchases',           emoji: '🎮' },
+  { value: 'account_balance',  label: 'Account & Balance Enquiries',    emoji: '📋' },
+  { value: 'clan_chat',        label: 'Clan Chat Access',               emoji: '🏰' },
+  { value: 'rank_purchases',   label: 'Rank Purchases',                 emoji: '🏅' },
+  { value: 'general_support',  label: 'General Questions & Support',    emoji: '❓' },
+  { value: 'other',            label: 'Any Other Requests',             emoji: '📬' },
+];
 
 function escapeHtml(text) {
   if (!text) return '';
@@ -119,25 +130,25 @@ const createTicketHandler = {
       if (currentTicketCount >= maxTicketsPerUser) {
         return await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: `You have reached the maximum number of open tickets (${maxTicketsPerUser}).\n\nPlease close your existing tickets first.` });
       }
-      
-      const modal = new ModalBuilder()
-        .setCustomId('create_ticket_modal')
-        .setTitle('Create a Ticket');
 
-      const reasonInput = new TextInputBuilder()
-        .setCustomId('reason')
-        .setLabel('Why are you creating this ticket?')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Describe your issue...')
-        .setRequired(true)
-        .setMaxLength(1000);
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId('ticket_category_select')
+        .setPlaceholder('Choose a category...')
+        .addOptions(TICKET_CATEGORIES.map(cat => ({
+          label: cat.label,
+          value: cat.value,
+          emoji: cat.emoji,
+        })));
 
-      const actionRow = new ActionRowBuilder().addComponents(reasonInput);
-      modal.addComponents(actionRow);
+      const row = new ActionRowBuilder().addComponents(selectMenu);
 
-      await interaction.showModal(modal);
+      await interaction.reply({
+        content: 'Please select a category for your ticket:',
+        components: [row],
+        flags: MessageFlags.Ephemeral,
+      });
     } catch (error) {
-      logger.error('Error creating ticket modal:', error);
+      logger.error('Error showing ticket category select:', error);
       if (!interaction.replied && !interaction.deferred) {
         await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'Could not open ticket creation form.' });
       }
