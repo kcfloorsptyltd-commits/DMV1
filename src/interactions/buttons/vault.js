@@ -7,7 +7,7 @@ import {
 } from 'discord.js';
 import { errorEmbed } from '../../utils/embeds.js';
 import { getEconomyData } from '../../utils/economy.js';
-import { checkVaultExpiry, getVaultStatus } from '../../utils/vaultSystem.js';
+import { checkVaultExpiry } from '../../utils/vaultSystem.js';
 
 export default {
     name: 'vault',
@@ -32,14 +32,6 @@ export default {
         }
 
         await checkVaultExpiry(client, interaction.user.id, interaction.guildId);
-        const activeVault = await getVaultStatus(client, interaction.user.id, interaction.guildId);
-        if (activeVault) {
-            await interaction.reply({
-                embeds: [errorEmbed('You already have GP locked in your vault.')],
-                flags: MessageFlags.Ephemeral,
-            });
-            return;
-        }
 
         const economyData = await getEconomyData(client, interaction.guildId, interaction.user.id);
         if ((economyData.wallet || 0) <= 0) {

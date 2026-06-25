@@ -15,7 +15,7 @@ import {
     buildLinkedRsnsValue,
     buildFightStats,
     buildRecentActivityRows,
-    formatVaultStatusText,
+    formatAllVaultsText,
 } from '../../utils/osrsProfile.js';
 import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -23,8 +23,6 @@ import { logger } from '../../utils/logger.js';
 import { OSRS_LINK_STATUSES } from '../../utils/database/osrs.js';
 import { isAuthorizedOsrsAdmin } from '../../utils/osrsAdminAuth.js';
 import { checkVaultExpiry, getVaultStatus } from '../../utils/vaultSystem.js';
-
-const AUTO_DELETE_DELAY = 10000; // 10 seconds
 
 function formatUpdatedFooter(date = new Date()) {
     const iso = date.toISOString().replace('T', ' ').slice(0, 16);
@@ -168,7 +166,6 @@ export default {
                     value: [
                         `**Wallet:** ${formatProfileCurrency(economyData.wallet || 0)}`,
                         `**Bank:** ${formatProfileCurrency(economyData.bank || 0)}`,
-                        `**Vault:** ${formatVaultStatusText(vaultStatus, { justReleased: vaultExpiry.released })}`,
                     ].join('\n'),
                     inline: true,
                 },
@@ -195,6 +192,13 @@ export default {
                         : 'No recent fights recorded.',
                     inline: false,
                 },
+                ...(vaultStatus
+                    ? [{
+                        name: `🔐 Vaults (${vaultStatus.length} Active)`,
+                        value: formatAllVaultsText(vaultStatus),
+                        inline: false,
+                    }]
+                    : []),
             ],
             footer: { text: formatUpdatedFooter() },
         });
@@ -212,7 +216,7 @@ export default {
         });
 
         const components = [];
-        if (targetUser.id === interaction.user.id && (economyData.wallet || 0) > 0 && !vaultStatus) {
+        if (targetUser.id === interaction.user.id && (economyData.wallet || 0) > 0) {
             components.push(
                 new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
@@ -227,14 +231,5 @@ export default {
             embeds: [embed],
             ...(components.length > 0 ? { components } : {}),
         });
-
-        // Auto-delete after 10 seconds
-        setTimeout(async () => {
-            try {
-                await interaction.deleteReply();
-            } catch (error) {
-                logger.debug('Could not auto-delete profile message', { error: error.message });
-            }
-        }, AUTO_DELETE_DELAY);
     }, { command: 'profile' }),
 };

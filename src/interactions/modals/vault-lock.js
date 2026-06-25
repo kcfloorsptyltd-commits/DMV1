@@ -2,7 +2,7 @@ import { ActionRowBuilder, MessageFlags, StringSelectMenuBuilder } from 'discord
 import { createEmbed, errorEmbed } from '../../utils/embeds.js';
 import { formatCurrency, getEconomyData, parseHumanAmount } from '../../utils/economy.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { checkVaultExpiry, getVaultStatus, VAULT_TIMEFRAME_CHOICES } from '../../utils/vaultSystem.js';
+import { checkVaultExpiry, VAULT_TIMEFRAME_CHOICES } from '../../utils/vaultSystem.js';
 
 export default {
     name: 'vault_lock',
@@ -32,14 +32,6 @@ export default {
         }
 
         await checkVaultExpiry(client, interaction.user.id, interaction.guildId);
-        const activeVault = await getVaultStatus(client, interaction.user.id, interaction.guildId);
-        if (activeVault) {
-            await InteractionHelper.safeEditReply(interaction, {
-                embeds: [errorEmbed('You already have GP locked in your vault.')],
-                components: [],
-            });
-            return;
-        }
 
         const economyData = await getEconomyData(client, interaction.guildId, interaction.user.id);
         if ((economyData.wallet || 0) < amount) {

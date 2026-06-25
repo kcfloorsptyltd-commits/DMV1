@@ -17,8 +17,19 @@ export const VAULT_TIMEFRAME_CHOICES = Object.freeze(
     })),
 );
 
-export function getVaultKey(userId, guildId) {
+// Legacy single-vault key (used for migration only)
+function getLegacyVaultKey(userId, guildId) {
     return `vault:${userId}:${guildId}`;
+}
+
+// Array-based vault key
+export function getVaultsKey(userId, guildId) {
+    return `vaults:${userId}:${guildId}`;
+}
+
+// Kept for test backward compatibility — points to the array key
+export function getVaultKey(userId, guildId) {
+    return getVaultsKey(userId, guildId);
 }
 
 function normalizeVaultRecord(record) {
@@ -39,6 +50,9 @@ function normalizeVaultRecord(record) {
     }
 
     return {
+        id: typeof record.id === 'string' && record.id.length > 0
+            ? record.id
+            : `${createdAt.getTime()}`,
         amount,
         lockedUntil: lockedUntil.toISOString(),
         createdAt: createdAt.toISOString(),
@@ -46,7 +60,62 @@ function normalizeVaultRecord(record) {
     };
 }
 
-async function releaseVault(client, userId, guildId, vault, releaseType = 'manual') {
+async function migrateFromLegacy(client, userId, guildId) {
+    const legacyKey = getLegacyVaultKey(userId, guildId);
+    const legacyData = await client.db.get(legacyKey, null);
+
+    if (!legacyData) return null;
+
+    const normalized = normalizeVaultRecord(legacyData);
+    if (!normalized) {
+        await client.db.delete(legacyKey).catch(() => {});
+        return null;
+    }
+
+    const vaults = [normalized];
+    await client.db.set(getVaultsKey(userId, guildId), vaults);
+    await client.db.delete(legacyKey).catch(() => {});
+
+    logger.info('[VAULT] Migrated legacy single vault to array format', { userId, guildId });
+    return vaults;
+}
+
+export async function getAllVaults(client, userId, guildId) {
+    if (!client?.db || typeof client.db.get !== 'function') {
+        return [];
+    }
+
+    const key = getVaultsKey(userId, guildId);
+    const rawData = await client.db.get(key, null);
+
+    if (!rawData) {
+        const migrated = await migrateFromLegacy(client, userId, guildId);
+        return migrated || [];
+    }
+
+    // Handle a plain object stored at the array key (graceful recovery)
+    if (!Array.isArray(rawData)) {
+        const normalized = normalizeVaultRecord(rawData);
+        if (normalized) {
+            const vaults = [normalized];
+            await client.db.set(key, vaults);
+            return vaults;
+        }
+        await client.db.delete(key).catch(() => {});
+        return [];
+    }
+
+    return rawData.map(normalizeVaultRecord).filter(Boolean);
+}
+
+async function releaseVaultById(client, userId, guildId, vaultId, releaseType = 'manual') {
+    const allVaults = await getAllVaults(client, userId, guildId);
+    const vault = allVaults.find((v) => v.id === vaultId);
+
+    if (!vault) {
+        return { success: false, error: 'Vault not found.' };
+    }
+
     const walletBefore = (await getEconomyData(client, guildId, userId)).wallet || 0;
     const addition = await addMoney(client, guildId, userId, vault.amount, 'wallet', { bypassLimits: true });
 
@@ -57,11 +126,19 @@ async function releaseVault(client, userId, guildId, vault, releaseType = 'manua
         };
     }
 
-    await client.db.delete(getVaultKey(userId, guildId));
+    const remaining = allVaults.filter((v) => v.id !== vaultId);
+    const key = getVaultsKey(userId, guildId);
+
+    if (remaining.length > 0) {
+        await client.db.set(key, remaining);
+    } else {
+        await client.db.delete(key);
+    }
 
     logger.info('[VAULT] Funds released', {
         guildId,
         userId,
+        vaultId,
         amount: vault.amount,
         releaseType,
     });
@@ -76,36 +153,57 @@ async function releaseVault(client, userId, guildId, vault, releaseType = 'manua
     };
 }
 
+// Returns array of non-expired active vaults, or null if none
 export async function getVaultStatus(client, userId, guildId) {
     if (!client?.db || typeof client.db.get !== 'function') {
         return null;
     }
 
-    const key = getVaultKey(userId, guildId);
-    const rawVault = await client.db.get(key, null);
-    const vault = normalizeVaultRecord(rawVault);
-
-    if (!vault && rawVault && typeof client.db.delete === 'function') {
-        await client.db.delete(key).catch(() => {});
-    }
-
-    return vault;
+    const vaults = await getAllVaults(client, userId, guildId);
+    const active = vaults.filter((v) => Date.now() < new Date(v.lockedUntil).getTime());
+    return active.length > 0 ? active : null;
 }
 
+// Releases all expired vaults for the user
 export async function checkVaultExpiry(client, userId, guildId) {
-    const vault = await getVaultStatus(client, userId, guildId);
+    const vaults = await getAllVaults(client, userId, guildId);
 
-    if (!vault) {
+    if (vaults.length === 0) {
         return { success: true, released: false, vault: null };
     }
 
-    if (Date.now() < new Date(vault.lockedUntil).getTime()) {
-        return { success: true, released: false, vault };
+    const now = Date.now();
+    const expired = vaults.filter((v) => now >= new Date(v.lockedUntil).getTime());
+    const remaining = vaults.filter((v) => now < new Date(v.lockedUntil).getTime());
+
+    if (expired.length === 0) {
+        return { success: true, released: false, vault: remaining[0] || null };
     }
 
-    return releaseVault(client, userId, guildId, vault, 'expiry');
+    let totalReleased = 0;
+    let lastWalletBefore = 0;
+    let lastWalletAfter = 0;
+
+    for (const vault of expired) {
+        const result = await releaseVaultById(client, userId, guildId, vault.id, 'expiry');
+        if (result.success) {
+            totalReleased += vault.amount;
+            lastWalletBefore = result.walletBefore;
+            lastWalletAfter = result.walletAfter;
+        }
+    }
+
+    return {
+        success: true,
+        released: true,
+        amount: totalReleased,
+        walletBefore: lastWalletBefore,
+        walletAfter: lastWalletAfter,
+        vault: remaining[0] || null,
+    };
 }
 
+// Adds a new vault to the player's vault array
 export async function lockVault(client, userId, guildId, amount, timeframe) {
     if (!client?.db || typeof client.db.get !== 'function' || typeof client.db.set !== 'function') {
         return { success: false, error: 'Database is unavailable.' };
@@ -121,14 +219,8 @@ export async function lockVault(client, userId, guildId, amount, timeframe) {
         return { success: false, error: 'Invalid vault timeframe selected.' };
     }
 
-    const expiryCheck = await checkVaultExpiry(client, userId, guildId);
-    if (!expiryCheck.success) {
-        return expiryCheck;
-    }
-
-    if (expiryCheck.vault) {
-        return { success: false, error: 'You already have GP locked in your vault.' };
-    }
+    // Release any expired vaults first
+    await checkVaultExpiry(client, userId, guildId);
 
     const economyData = await getEconomyData(client, guildId, userId);
     if ((economyData.wallet || 0) < parsedAmount) {
@@ -142,6 +234,7 @@ export async function lockVault(client, userId, guildId, amount, timeframe) {
 
     const now = new Date();
     const vaultRecord = {
+        id: `${now.getTime()}`,
         amount: parsedAmount,
         lockedUntil: new Date(now.getTime() + timeframeConfig.durationMs).toISOString(),
         createdAt: now.toISOString(),
@@ -149,11 +242,13 @@ export async function lockVault(client, userId, guildId, amount, timeframe) {
     };
 
     try {
-        await client.db.set(getVaultKey(userId, guildId), vaultRecord);
+        const existingVaults = await getAllVaults(client, userId, guildId);
+        await client.db.set(getVaultsKey(userId, guildId), [...existingVaults, vaultRecord]);
 
         logger.info('[VAULT] Funds locked', {
             guildId,
             userId,
+            vaultId: vaultRecord.id,
             amount: parsedAmount,
             timeframe,
             lockedUntil: vaultRecord.lockedUntil,
@@ -172,12 +267,19 @@ export async function lockVault(client, userId, guildId, amount, timeframe) {
     }
 }
 
-export async function unlockVaultForce(client, userId, guildId) {
-    const vault = await getVaultStatus(client, userId, guildId);
+// Unlocks a specific vault by ID, or the first vault if no ID provided
+export async function unlockVaultForce(client, userId, guildId, vaultId) {
+    const vaults = await getAllVaults(client, userId, guildId);
 
-    if (!vault) {
+    if (vaults.length === 0) {
         return { success: false, released: false, error: 'This player does not have any GP locked in a vault.' };
     }
 
-    return releaseVault(client, userId, guildId, vault, 'force');
+    const target = vaultId ? vaults.find((v) => v.id === vaultId) : vaults[0];
+
+    if (!target) {
+        return { success: false, released: false, error: 'The specified vault was not found.' };
+    }
+
+    return releaseVaultById(client, userId, guildId, target.id, 'force');
 }
