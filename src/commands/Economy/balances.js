@@ -193,13 +193,10 @@ export default {
 
                 try {
                     const economyKey = `economy:${guildId}:${member.id}`;
-                    
-                    // Use the proper database call pattern with default value
                     const userData = await client.db.get(economyKey, null);
                     
                     processedCount++;
 
-                    // Only add if userData exists and has wallet data
                     if (userData && typeof userData === 'object') {
                         const wallet = Number(userData.wallet) || 0;
                         const bank = Number(userData.bank) || 0;
@@ -273,12 +270,19 @@ export default {
                 );
             }
 
-            const message = await InteractionHelper.safeEditReply(interaction, {
+            // Edit reply and fetch the actual message
+            await InteractionHelper.safeEditReply(interaction, {
                 embeds: [leaderboardEmbeds[0]],
                 components: [buttons]
             });
 
-            if (!message) return;
+            // Fetch the actual message using the interaction
+            const message = await interaction.fetchReply().catch(() => null);
+
+            if (!message) {
+                logger.error('Failed to fetch reply message for balances command');
+                return;
+            }
 
             const collector = message.createMessageComponentCollector({
                 filter: i => i.user.id === interaction.user.id,
