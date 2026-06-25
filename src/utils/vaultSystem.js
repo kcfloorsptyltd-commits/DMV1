@@ -30,7 +30,11 @@ function normalizeVaultRecord(record) {
     const lockedUntil = new Date(record.lockedUntil);
     const createdAt = new Date(record.createdAt || record.lockedUntil);
 
-    if (!Number.isFinite(amount) || amount <= 0 || Number.isNaN(lockedUntil.getTime()) || Number.isNaN(createdAt.getTime())) {
+    const isInvalidAmount = !Number.isFinite(amount) || amount <= 0;
+    const isInvalidLockedUntil = Number.isNaN(lockedUntil.getTime());
+    const isInvalidCreatedAt = Number.isNaN(createdAt.getTime());
+
+    if (isInvalidAmount || isInvalidLockedUntil || isInvalidCreatedAt) {
         return null;
     }
 
