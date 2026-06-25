@@ -1,15 +1,154 @@
-import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { logger } from '../../utils/logger.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { errorEmbed, infoEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
-import { getGuildConfig } from '../../services/guildConfig.js';
 import { formatCurrency } from '../../utils/economy.js';
+
+const ENTRIES_PER_PAGE = 10;
+
+function formatCurrencyCompact(amount) {
+    if (amount >= 1_000_000) {
+        return `${(amount / 1_000_000).toFixed(1)}M`;
+    }
+    if (amount >= 1_000) {
+        return `${(amount / 1_000).toFixed(1)}K`;
+    }
+    return amount.toString();
+}
+
+function createProgressBar(current, max, length = 15) {
+    const percentage = Math.min(current / max, 1);
+    const filled = Math.round(length * percentage);
+    const empty = length - filled;
+    return `${'█'.repeat(filled)}${'░'.repeat(empty)}`;
+}
+
+function getMedalEmoji(rank) {
+    switch (rank) {
+        case 1: return '🥇';
+        case 2: return '🥈';
+        case 3: return '🥉';
+        default: return `${rank}️⃣`;
+    }
+}
+
+function buildLeaderboardEmbed(balances, page = 1) {
+    const totalPages = Math.ceil(balances.length / ENTRIES_PER_PAGE);
+    const start = (page - 1) * ENTRIES_PER_PAGE;
+    const pageBalances = balances.slice(start, start + ENTRIES_PER_PAGE);
+
+    const maxBalance = balances[0]?.total || 1; // For progress bar scaling
+
+    const embed = new EmbedBuilder()
+        .setTitle('💎 ═══ WEALTH LEADERBOARD ═══ 💎')
+        .setColor(0xB8860B); // Dark gold
+
+    // Add top 3 special cards at the top (only on first page)
+    if (page === 1) {
+        const topThree = balances.slice(0, 3);
+        let topSection = '';
+
+        topThree.forEach((balance, idx) => {
+            const medal = getMedalEmoji(idx + 1);
+            const name = balance.displayName.substring(0, 20);
+            const total = formatCurrency(balance.total);
+            const bar = createProgressBar(balance.total, maxBalance, 12);
+            topSection += `${medal} **${name}** → ${total}\n   ${bar}\n\n`;
+        });
+
+        embed.addFields({
+            name: '🏆 TOP 3 RICHEST',
+            value: topSection.trim(),
+            inline: false
+        });
+    }
+
+    // Main leaderboard section
+    let leaderboardText = '```\n';
+    leaderboardText += 'RANK  NAME                 WALLET       TOTAL\n';
+    leaderboardText += '──────────────────────────────────────────────────\n';
+
+    pageBalances.forEach((balance, idx) => {
+        const rank = start + idx + 1;
+        const name = balance.displayName.substring(0, 18).padEnd(18);
+        const wallet = formatCurrencyCompact(balance.wallet).padStart(10);
+        const total = formatCurrency(balance.total).padStart(12);
+
+        leaderboardText += `${rank.toString().padStart(2)}.  │ ${name} │ ${wallet} │ ${total}\n`;
+    });
+
+    leaderboardText += '```';
+
+    embed.addFields({
+        name: '📊 LEADERBOARD',
+        value: leaderboardText,
+        inline: false
+    });
+
+    // Stats footer
+    const pageStart = start + 1;
+    const pageEnd = Math.min(start + ENTRIES_PER_PAGE, balances.length);
+
+    embed.setFooter({
+        text: `Page ${page}/${totalPages} • Showing ${pageStart}-${pageEnd} of ${balances.length} members • Total Wealth: ${formatCurrency(balances.reduce((sum, b) => sum + b.total, 0))}`
+    });
+
+    embed.setTimestamp();
+
+    return embed;
+}
+
+function buildStatsEmbed(balances) {
+    const totalWealth = balances.reduce((sum, b) => sum + b.total, 0);
+    const avgWealth = Math.floor(totalWealth / balances.length);
+    const richest = balances[0];
+    const poorest = balances[balances.length - 1];
+    const topWallet = balances.reduce((max, b) => b.wallet > max ? b.wallet : max, 0);
+    const topBank = balances.reduce((max, b) => b.bank > max ? b.bank : max, 0);
+
+    return new EmbedBuilder()
+        .setTitle('📈 WEALTH STATISTICS')
+        .setColor(0xB8860B)
+        .addFields(
+            {
+                name: '💰 Total Server Wealth',
+                value: `\`\`\`${formatCurrency(totalWealth)}\`\`\``,
+                inline: true
+            },
+            {
+                name: '📊 Average Member Wealth',
+                value: `\`\`\`${formatCurrency(avgWealth)}\`\`\``,
+                inline: true
+            },
+            {
+                name: '👑 Richest Member',
+                value: `**${richest.displayName}** → ${formatCurrency(richest.total)}`,
+                inline: false
+            },
+            {
+                name: '💸 Poorest Member',
+                value: `**${poorest.displayName}** → ${formatCurrency(poorest.total)}`,
+                inline: false
+            },
+            {
+                name: '🏦 Highest Wallet',
+                value: `\`\`\`${formatCurrency(topWallet)}\`\`\``,
+                inline: true
+            },
+            {
+                name: '🏛️ Highest Bank',
+                value: `\`\`\`${formatCurrency(topBank)}\`\`\``,
+                inline: true
+            }
+        )
+        .setTimestamp();
+}
 
 export default {
     data: new SlashCommandBuilder()
         .setName('balances')
-        .setDescription('View all member balances (highest to lowest) - Admin/Support only')
+        .setDescription('View all member balances in an awesome leaderboard - Admin/Support only')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .setDMPermission(false),
 
@@ -78,61 +217,130 @@ export default {
             // Sort by total balance (highest to lowest)
             balances.sort((a, b) => b.total - a.total);
 
-            // Create paginated embeds (15 entries per page)
-            const ENTRIES_PER_PAGE = 15;
-            const pages = [];
+            // Build embeds
+            const leaderboardEmbeds = [];
+            const totalPages = Math.ceil(balances.length / ENTRIES_PER_PAGE);
 
-            for (let i = 0; i < balances.length; i += ENTRIES_PER_PAGE) {
-                const pageBalances = balances.slice(i, i + ENTRIES_PER_PAGE);
-                const pageNum = Math.floor(i / ENTRIES_PER_PAGE) + 1;
-                const totalPages = Math.ceil(balances.length / ENTRIES_PER_PAGE);
-
-                let description = '```\n';
-                description += 'RANK │ MEMBER           │ WALLET       │ BANK         │ TOTAL\n';
-                description += '─────┼──────────────────┼──────────────┼──────────────┼──────────────\n';
-
-                pageBalances.forEach((balance, idx) => {
-                    const rank = (i + idx + 1).toString().padStart(3);
-                    const name = balance.displayName.substring(0, 16).padEnd(16);
-                    const wallet = formatCurrency(balance.wallet).padStart(12);
-                    const bank = formatCurrency(balance.bank).padStart(12);
-                    const total = formatCurrency(balance.total).padStart(12);
-                    
-                    description += `${rank}  │ ${name} │ ${wallet} │ ${bank} │ ${total}\n`;
-                });
-
-                description += '```';
-
-                const embed = new EmbedBuilder()
-                    .setTitle('💰 SERVER BALANCE LEADERBOARD')
-                    .setDescription(description)
-                    .setColor(0x8B860B) // Gold
-                    .setFooter({ text: `Page ${pageNum} of ${totalPages} • Total Members: ${balances.length}` })
-                    .setTimestamp();
-
-                pages.push(embed);
+            for (let page = 1; page <= totalPages; page++) {
+                leaderboardEmbeds.push(buildLeaderboardEmbed(balances, page));
             }
 
-            // Send first page
-            await InteractionHelper.safeEditReply(interaction, {
-                embeds: [pages[0]]
+            const statsEmbed = buildStatsEmbed(balances);
+
+            // Create pagination buttons
+            const buttons = new ActionRowBuilder();
+
+            if (totalPages > 1) {
+                buttons.addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('leaderboard_prev')
+                        .setLabel('← Previous')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setDisabled(true),
+                    new ButtonBuilder()
+                        .setCustomId('leaderboard_page')
+                        .setLabel('Page 1/' + totalPages)
+                        .setStyle(ButtonStyle.Primary)
+                        .setDisabled(true),
+                    new ButtonBuilder()
+                        .setCustomId('leaderboard_next')
+                        .setLabel('Next →')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setDisabled(totalPages === 1),
+                    new ButtonBuilder()
+                        .setCustomId('leaderboard_stats')
+                        .setLabel('📈 Stats')
+                        .setStyle(ButtonStyle.Secondary)
+                );
+            } else {
+                buttons.addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('leaderboard_stats')
+                        .setLabel('📈 Stats')
+                        .setStyle(ButtonStyle.Secondary)
+                );
+            }
+
+            // Send initial message
+            const message = await InteractionHelper.safeEditReply(interaction, {
+                embeds: [leaderboardEmbeds[0]],
+                components: totalPages > 1 ? [buttons] : [buttons]
             });
 
-            // If multiple pages, send rest as follow-ups
-            if (pages.length > 1) {
-                for (let i = 1; i < pages.length; i++) {
-                    await interaction.followUp({
-                        embeds: [pages[i]],
-                        flags: MessageFlags.Ephemeral
-                    }).catch(() => {});
+            if (!message) return;
+
+            // Create button collector
+            const collector = message.createMessageComponentCollector({
+                filter: i => i.user.id === interaction.user.id,
+                time: 5 * 60 * 1000 // 5 minutes
+            });
+
+            let currentPage = 1;
+
+            collector.on('collect', async btnInteraction => {
+                try {
+                    if (btnInteraction.customId === 'leaderboard_next') {
+                        currentPage = Math.min(currentPage + 1, totalPages);
+                    } else if (btnInteraction.customId === 'leaderboard_prev') {
+                        currentPage = Math.max(currentPage - 1, 1);
+                    } else if (btnInteraction.customId === 'leaderboard_stats') {
+                        await btnInteraction.update({
+                            embeds: [statsEmbed],
+                            components: [
+                                new ActionRowBuilder().addComponents(
+                                    new ButtonBuilder()
+                                        .setCustomId('leaderboard_back')
+                                        .setLabel('← Back to Leaderboard')
+                                        .setStyle(ButtonStyle.Secondary)
+                                )
+                            ]
+                        });
+                        return;
+                    } else if (btnInteraction.customId === 'leaderboard_back') {
+                        currentPage = 1;
+                    }
+
+                    // Update buttons
+                    const updatedButtons = new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId('leaderboard_prev')
+                            .setLabel('← Previous')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setDisabled(currentPage === 1),
+                        new ButtonBuilder()
+                            .setCustomId('leaderboard_page')
+                            .setLabel(`Page ${currentPage}/${totalPages}`)
+                            .setStyle(ButtonStyle.Primary)
+                            .setDisabled(true),
+                        new ButtonBuilder()
+                            .setCustomId('leaderboard_next')
+                            .setLabel('Next →')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setDisabled(currentPage === totalPages),
+                        new ButtonBuilder()
+                            .setCustomId('leaderboard_stats')
+                            .setLabel('📈 Stats')
+                            .setStyle(ButtonStyle.Secondary)
+                    );
+
+                    await btnInteraction.update({
+                        embeds: [leaderboardEmbeds[currentPage - 1]],
+                        components: [updatedButtons]
+                    });
+                } catch (error) {
+                    logger.error('Error handling leaderboard button:', error);
                 }
-            }
+            });
+
+            collector.on('end', () => {
+                message.edit({ components: [] }).catch(() => {});
+            });
 
             logger.info('Balances leaderboard viewed', {
                 userId: interaction.user.id,
                 guildId: guildId,
                 memberCount: balances.length,
-                pages: pages.length
+                pages: totalPages
             });
 
         } catch (error) {
