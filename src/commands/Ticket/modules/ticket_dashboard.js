@@ -83,25 +83,35 @@ async function persistPanelMessageId(client, guildId, guildConfig, messageId) {
 
 function buildPanelEmbed(config) {
     return new EmbedBuilder()
-        .setTitle('🎫 SUPPORT & SERVICES TICKET 🎫')
-        .setDescription(config.ticketPanelMessage || 'Need assistance? You\'re in the right place!')
+        .setTitle('🎫 ═══ SUPPORT & SERVICES TICKET ═══ 🎫')
+        .setDescription('**Need assistance? You\'re in the right place!**')
         .addFields(
             {
-                name: 'Please open a ticket for any of the following:',
-                value: '💰 Gold Deposits\n💰 Gold Withdrawals\n🎮 In-Game GP Purchases\n📋 Account & Balance Enquiries\n🏰 Clan Chat Access\n🏅 Rank Purchases\n❓ General Questions & Support\n📬 Any Other Requests',
+                name: '\n⚔️ Please open a ticket for any of the following:',
+                value: [
+                    '💰 **GOLD DEPOSITS**',
+                    '💰 **GOLD WITHDRAWALS**',
+                    '🎮 **IN-GAME GP PURCHASES**',
+                    '📋 **ACCOUNT & BALANCE ENQUIRIES**',
+                    '🏰 **CLAN CHAT ACCESS**',
+                    '🏅 **RANK PURCHASES**',
+                    '❓ **GENERAL QUESTIONS & SUPPORT**',
+                    '📬 **ANY OTHER REQUESTS**',
+                ].join('\n'),
                 inline: false,
             }
         )
-        .setColor(0xB8860B) // Dark gold/medieval color
-        .setFooter({ text: 'WE\'RE HERE TO HELP. ALWAYS.' });
+        .setColor(0x8B0000) // Dark red
+        .setFooter({ text: '⚔️ WE\'RE HERE TO HELP. ALWAYS. ⚔️' })
+        .setTimestamp();
 }
 
 function buildPanelButtonRow(config) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('create_ticket')
-            .setLabel(config.ticketButtonLabel || 'Create Ticket')
-            .setStyle(ButtonStyle.Danger) // Red/dark style
+            .setLabel(config.ticketButtonLabel || '📧 CREATE TICKET')
+            .setStyle(ButtonStyle.Danger)
             .setEmoji('📬'),
     );
 }
