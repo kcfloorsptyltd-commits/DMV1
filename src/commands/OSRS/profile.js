@@ -1,5 +1,11 @@
-import { SlashCommandBuilder, MessageFlags } from 'discord.js';
-import { createEmbed } from '../../utils/embeds.js';
+import {
+    SlashCommandBuilder,
+    MessageFlags,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+} from 'discord.js';
+import { createEmbed, errorEmbed } from '../../utils/embeds.js';
 import { getEconomyData } from '../../utils/economy.js';
 import { getPvpStats, getRecentPvpEvents } from '../../utils/database/pvp.js';
 import { getOsrsLinkKey, getOsrsLinksPrefix } from '../../utils/database/keys.js';
@@ -9,11 +15,14 @@ import {
     buildLinkedRsnsValue,
     buildFightStats,
     buildRecentActivityRows,
+    formatVaultStatusText,
 } from '../../utils/osrsProfile.js';
 import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { logger } from '../../utils/logger.js';
 import { OSRS_LINK_STATUSES } from '../../utils/database/osrs.js';
+import { isAuthorizedOsrsAdmin } from '../../utils/osrsAdminAuth.js';
+import { checkVaultExpiry, getVaultStatus } from '../../utils/vaultSystem.js';
 
 const AUTO_DELETE_DELAY = 10000; // 10 seconds
 
@@ -51,6 +60,12 @@ export default {
     data: new SlashCommandBuilder()
         .setName('profile')
         .setDescription('View your OSRS staking profile with linked accounts, balances, and fight stats')
+        .addUserOption((option) =>
+            option
+                .setName('user')
+                .setDescription('User to view (admin/support/owner only)')
+                .setRequired(false),
+        )
         .setDMPermission(false),
 
     execute: withErrorHandling(async (interaction, _config, client) => {
@@ -58,8 +73,21 @@ export default {
         if (!deferred) return;
 
         const guildId = interaction.guildId;
-        const targetUser = interaction.user;
-        const member = interaction.member;
+        const requestedUser = interaction.options.getUser('user');
+        const targetUser = requestedUser || interaction.user;
+
+        if (requestedUser && requestedUser.id !== interaction.user.id) {
+            const allowed = await isAuthorizedOsrsAdmin(interaction, client);
+            if (!allowed) {
+                await InteractionHelper.safeEditReply(interaction, {
+                    embeds: [errorEmbed('You can only view your own profile')],
+                });
+                return;
+            }
+        }
+
+        const vaultExpiry = await checkVaultExpiry(client, targetUser.id, guildId);
+        const vaultStatus = await getVaultStatus(client, targetUser.id, guildId);
 
         const rawLinks = await client.db.get(getOsrsLinkKey(guildId, targetUser.id), null);
 
@@ -139,7 +167,8 @@ export default {
                     name: '💰 Wallet / Balance',
                     value: [
                         `**Wallet:** ${formatProfileCurrency(economyData.wallet || 0)}`,
-                        `**Vault:** ${formatProfileCurrency(economyData.bank || 0)}`,
+                        `**Bank:** ${formatProfileCurrency(economyData.bank || 0)}`,
+                        `**Vault:** ${formatVaultStatusText(vaultStatus, { justReleased: vaultExpiry.released })}`,
                     ].join('\n'),
                     inline: true,
                 },
@@ -179,9 +208,25 @@ export default {
             linkedAccounts: linkedUsernames.length,
             pendingAccounts: pendingUsernames.length,
             fightsShown: recentActivityRows.length,
+            vaultReleased: vaultExpiry.released,
         });
 
-        await InteractionHelper.safeEditReply(interaction, { embeds: [embed] });
+        const components = [];
+        if (targetUser.id === interaction.user.id && (economyData.wallet || 0) > 0 && !vaultStatus) {
+            components.push(
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`vault:${interaction.user.id}`)
+                        .setLabel('🔐 Vault')
+                        .setStyle(ButtonStyle.Primary),
+                ),
+            );
+        }
+
+        await InteractionHelper.safeEditReply(interaction, {
+            embeds: [embed],
+            ...(components.length > 0 ? { components } : {}),
+        });
 
         // Auto-delete after 10 seconds
         setTimeout(async () => {
