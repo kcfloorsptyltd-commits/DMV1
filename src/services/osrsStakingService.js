@@ -52,6 +52,10 @@ async function recordResolvedFightPvp(client, fight, winnerId) {
     }
 }
 
+function isNewFightResolution(previousFight, resolvedFight) {
+    return !previousFight?.winner_id && Boolean(resolvedFight?.winner_id);
+}
+
 
 export async function findUserFight(client, guildId, userId, fightId = null, statuses = [FIGHT_STATUSES.PENDING, FIGHT_STATUSES.ACTIVE]) {
     if (fightId) {
@@ -115,7 +119,7 @@ export async function handleFightChallenge(client, guildId, challengerId, oppone
                     source: 'report_timeout',
                     reported_winner: existingFight.reported_winner,
                 });
-                if (!existingFight.winner_id && resolvedFight?.winner_id) {
+                if (isNewFightResolution(existingFight, resolvedFight)) {
                     await recordResolvedFightPvp(client, resolvedFight, resolvedFight.winner_id);
                 }
             } else {
@@ -203,7 +207,7 @@ export async function handleFightReport(client, guildId, reporterId, winnerId, f
             source: 'report_timeout',
             reported_winner: winnerId,
         });
-        if (!fight.winner_id && resolvedFight?.winner_id) {
+        if (isNewFightResolution(fight, resolvedFight)) {
             await recordResolvedFightPvp(client, resolvedFight, resolvedFight.winner_id);
         }
         return resolvedFight;
@@ -254,7 +258,7 @@ export async function handleFightResult(client, guildId, userId, confirmation, f
         const resolved = await payoutFightWinner(client, fight.id, winnerId, {
             source: 'dual_confirmation',
         });
-        if (!fight.winner_id && resolved?.winner_id) {
+        if (isNewFightResolution(fight, resolved)) {
             await recordResolvedFightPvp(client, resolved, resolved.winner_id);
         }
         return { fight: resolved, outcome: 'resolved', winnerId };
@@ -301,7 +305,7 @@ export async function resolveFightDispute(client, guildId, fightId, resolution, 
         challengerPayout: resolution === 'pay_challenger' ? fight.amount * 2 : 0,
         opponentPayout: resolution === 'pay_opponent' ? fight.amount * 2 : 0,
     });
-    if (!fight.winner_id && resolvedFight?.winner_id) {
+    if (isNewFightResolution(fight, resolvedFight)) {
         await recordResolvedFightPvp(client, resolvedFight, resolvedFight.winner_id);
     }
     return resolvedFight;
@@ -366,7 +370,7 @@ export async function expirePendingFights(client) {
                 source: 'report_timeout',
                 reported_winner: fight.reported_winner,
             });
-            if (!fight.winner_id && resolvedFight?.winner_id) {
+            if (isNewFightResolution(fight, resolvedFight)) {
                 await recordResolvedFightPvp(client, resolvedFight, resolvedFight.winner_id);
             }
             // Update the shared embed to AUTO COMPLETED state

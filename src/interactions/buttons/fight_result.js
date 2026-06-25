@@ -2,6 +2,7 @@ import { errorEmbed } from '../../utils/embeds.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { getFight, saveFight, payoutFightWinner } from '../../utils/database/fights.js';
 import { recordPvpKill } from '../../utils/database/pvp.js';
+import { logger } from '../../utils/logger.js';
 import { createFightDisputeTicket } from '../../utils/osrsFightDispute.js';
 import { logFightStage } from '../../utils/activityTracking.js';
 import { Mutex } from '../../utils/mutex.js';
@@ -169,7 +170,7 @@ export default {
                                     skipFightResolution: true,
                                 });
                             } catch (error) {
-                                // Do not fail the interaction after payout if PvP stat recording fails
+                                logger.error(`[PVP] Failed to record resolved fight ${updatedFight.id} for guild ${updatedFight.guildId}:`, error);
                             }
                         }
 
