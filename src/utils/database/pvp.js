@@ -1,7 +1,6 @@
 import { logger } from '../logger.js';
 import { db } from './wrapper.js';
 import { getPvpStatsKey, getPvpRecentKey } from './keys.js';
-import { resolveFightFromWebhook } from '../../services/osrsStakingService.js';
 
 export { getPvpStatsKey, getPvpRecentKey } from './keys.js';
 
@@ -37,44 +36,53 @@ export async function savePvpStats(guildId, playerName, data) {
  * Record a kill for the killer and a death for the victim.
  * Also appends an entry to the recent-events list for the guild.
  */
-export async function recordPvpKill(guildId, killerName, victimName) {
+export async function recordPvpKill(guildId, killerName, victimName, options = {}) {
     try {
-        if (!db.initialized) {
-            await db.initialize();
+        const customDb = options.client?.db;
+        const skipFightResolution = options.skipFightResolution === true;
+        const dbClient = customDb || db;
+
+        if (typeof dbClient.initialize === 'function' && !dbClient.initialized) {
+            await dbClient.initialize();
         }
 
         const now = new Date().toISOString();
 
         // Update killer stats
-        const killerStats = await getPvpStats(guildId, killerName);
+        const killerKey = getPvpStatsKey(guildId, killerName);
+        const killerStats = (await dbClient.get(killerKey)) || { kills: 0, deaths: 0, lastKill: null, lastDeath: null };
         killerStats.kills = (killerStats.kills || 0) + 1;
         killerStats.lastKill = now;
-        await savePvpStats(guildId, killerName, killerStats);
+        await dbClient.set(killerKey, killerStats);
 
         // Update victim stats
-        const victimStats = await getPvpStats(guildId, victimName);
+        const victimKey = getPvpStatsKey(guildId, victimName);
+        const victimStats = (await dbClient.get(victimKey)) || { kills: 0, deaths: 0, lastKill: null, lastDeath: null };
         victimStats.deaths = (victimStats.deaths || 0) + 1;
         victimStats.lastDeath = now;
-        await savePvpStats(guildId, victimName, victimStats);
+        await dbClient.set(victimKey, victimStats);
 
         // Append to recent events list
         const recentKey = getPvpRecentKey(guildId);
-        const recentData = (await db.get(recentKey)) || [];
+        const recentData = (await dbClient.get(recentKey)) || [];
         recentData.unshift({ killer: killerName, victim: victimName, timestamp: now });
         if (recentData.length > MAX_RECENT_EVENTS) {
             recentData.length = MAX_RECENT_EVENTS;
         }
-        await db.set(recentKey, recentData);
+        await dbClient.set(recentKey, recentData);
 
-        const webhookResult = await resolveFightFromWebhook({ db }, guildId, killerName, victimName);
-        if (webhookResult) {
-            const { fight, outcome } = webhookResult;
-            if (outcome === 'resolved') {
-                logger.info(`[PVP] Resolved OSRS fight ${fight.id} from webhook kill in guild ${guildId}`);
-            } else if (outcome === 'dispute') {
-                logger.warn(`[PVP] Fight ${fight.id} in guild ${guildId} entered dispute state from webhook kill — conflicting confirmations`);
-            } else if (outcome === 'waiting') {
-                logger.info(`[PVP] Fight ${fight.id} in guild ${guildId}: webhook confirmed killer, waiting for opponent confirmation`);
+        if (!skipFightResolution) {
+            const { resolveFightFromWebhook } = await import('../../services/osrsStakingService.js');
+            const webhookResult = await resolveFightFromWebhook({ db: dbClient }, guildId, killerName, victimName);
+            if (webhookResult) {
+                const { fight, outcome } = webhookResult;
+                if (outcome === 'resolved') {
+                    logger.info(`[PVP] Resolved OSRS fight ${fight.id} from webhook kill in guild ${guildId}`);
+                } else if (outcome === 'dispute') {
+                    logger.warn(`[PVP] Fight ${fight.id} in guild ${guildId} entered dispute state from webhook kill — conflicting confirmations`);
+                } else if (outcome === 'waiting') {
+                    logger.info(`[PVP] Fight ${fight.id} in guild ${guildId}: webhook confirmed killer, waiting for opponent confirmation`);
+                }
             }
         }
 

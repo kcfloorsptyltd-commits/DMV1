@@ -1,6 +1,7 @@
 import { errorEmbed } from '../../utils/embeds.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { getFight, saveFight, payoutFightWinner } from '../../utils/database/fights.js';
+import { recordPvpKill } from '../../utils/database/pvp.js';
 import { createFightDisputeTicket } from '../../utils/osrsFightDispute.js';
 import { logFightStage } from '../../utils/activityTracking.js';
 import { Mutex } from '../../utils/mutex.js';
@@ -155,6 +156,22 @@ export default {
                             : updatedFight.challenger_id;
 
                         const resolvedFight = await payoutFightWinner(client, updatedFight.id, winnerId, { source: 'dual_confirmation' });
+                        const winnerName = winnerId === updatedFight.challenger_id
+                            ? updatedFight.challengerOsrsUsername
+                            : updatedFight.opponentOsrsUsername;
+                        const loserName = winnerId === updatedFight.challenger_id
+                            ? updatedFight.opponentOsrsUsername
+                            : updatedFight.challengerOsrsUsername;
+                        if (winnerName && loserName) {
+                            try {
+                                await recordPvpKill(updatedFight.guildId, winnerName, loserName, {
+                                    client,
+                                    skipFightResolution: true,
+                                });
+                            } catch (error) {
+                                // Do not fail the interaction after payout if PvP stat recording fails
+                            }
+                        }
 
                         // Update the shared embed to COMPLETED state — removes buttons
                         await interaction.editReply({
