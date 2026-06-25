@@ -17,13 +17,6 @@ function formatCurrencyCompact(amount) {
     return amount.toString();
 }
 
-function createProgressBar(current, max, length = 15) {
-    const percentage = Math.min(current / max, 1);
-    const filled = Math.round(length * percentage);
-    const empty = length - filled;
-    return `${'█'.repeat(filled)}${'░'.repeat(empty)}`;
-}
-
 function getMedalEmoji(rank) {
     switch (rank) {
         case 1: return '🥇';
@@ -38,8 +31,6 @@ function buildLeaderboardEmbed(balances, page = 1) {
     const start = (page - 1) * ENTRIES_PER_PAGE;
     const pageBalances = balances.slice(start, start + ENTRIES_PER_PAGE);
 
-    const maxBalance = balances[0]?.total || 1;
-
     const embed = new EmbedBuilder()
         .setTitle('💎 ═══ WEALTH LEADERBOARD ═══ 💎')
         .setColor(0xB8860B);
@@ -52,8 +43,7 @@ function buildLeaderboardEmbed(balances, page = 1) {
             const medal = getMedalEmoji(idx + 1);
             const name = balance.displayName.substring(0, 20);
             const total = formatCurrency(balance.total);
-            const bar = createProgressBar(balance.total, maxBalance, 12);
-            topSection += `${medal} **${name}** → ${total}\n   ${bar}\n\n`;
+            topSection += `${medal} **${name}** → ${total}\n`;
         });
 
         embed.addFields({
