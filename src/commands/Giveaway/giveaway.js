@@ -58,7 +58,7 @@ export default {
                 .addStringOption(opt =>
                     opt
                         .setName('messageid')
-                        .setDescription('Message ID of the giveaway to end')
+                        .setDescription('Message ID of the giveaway to end (or "all" to end all)')
                         .setRequired(true)
                 )
         )
@@ -256,26 +256,32 @@ async function handleEnd(interaction) {
         );
     }
 
-    const messageId = interaction.options.getString('messageid');
+    const messageIdInput = interaction.options.getString('messageid');
 
-    if (!messageId || !/^\d+$/.test(messageId)) {
+    // Handle "all" option
+    if (messageIdInput.toLowerCase() === 'all') {
+        await handleEndAll(interaction);
+        return;
+    }
+
+    if (!messageIdInput || !/^\d+$/.test(messageIdInput)) {
         throw new TitanBotError(
             'Invalid message ID',
             ErrorTypes.VALIDATION,
-            'Please provide a valid message ID.',
-            { providedId: messageId }
+            'Please provide a valid message ID or "all" to end all giveaways.',
+            { providedId: messageIdInput }
         );
     }
 
     const giveaways = await getGuildGiveaways(interaction.client, interaction.guildId);
-    const giveaway = giveaways.find(g => g.messageId === messageId);
+    const giveaway = giveaways.find(g => g.messageId === messageIdInput);
 
     if (!giveaway) {
         throw new TitanBotError(
             'Giveaway not found',
             ErrorTypes.VALIDATION,
             'No giveaway was found with that message ID.',
-            { messageId, guildId: interaction.guildId }
+            { messageId: messageIdInput, guildId: interaction.guildId }
         );
     }
 
@@ -301,18 +307,18 @@ async function handleEnd(interaction) {
             'Channel not found',
             ErrorTypes.VALIDATION,
             'Could not find the channel where the giveaway was hosted.',
-            { channelId: updatedGiveaway.channelId, messageId }
+            { channelId: updatedGiveaway.channelId, messageId: messageIdInput }
         );
     }
 
-    const message = await channel.messages.fetch(messageId).catch(() => null);
+    const message = await channel.messages.fetch(messageIdInput).catch(() => null);
 
     if (!message) {
         throw new TitanBotError(
             'Message not found',
             ErrorTypes.VALIDATION,
             'Could not find the giveaway message.',
-            { messageId, channelId: updatedGiveaway.channelId }
+            { messageId: messageIdInput, channelId: updatedGiveaway.channelId }
         );
     }
 
@@ -337,12 +343,12 @@ async function handleEnd(interaction) {
             content: `🎉 CONGRATULATIONS ${winnerMentions}! You won the **${updatedGiveaway.prize}** giveaway! Please contact the host <@${updatedGiveaway.hostId}> to claim your prize.`
         });
 
-        logger.info(`Giveaway ended with ${winners.length} winner(s): ${messageId}`);
+        logger.info(`Giveaway ended with ${winners.length} winner(s): ${messageIdInput}`);
     } else {
         await channel.send({
             content: `The giveaway for **${updatedGiveaway.prize}** has ended with no valid entries.`,
         });
-        logger.info(`Giveaway ended with no winners: ${messageId}`);
+        logger.info(`Giveaway ended with no winners: ${messageIdInput}`);
     }
 
     await InteractionHelper.safeReply(interaction, {
@@ -354,6 +360,118 @@ async function handleEnd(interaction) {
         ],
         flags: MessageFlags.Ephemeral,
     });
+}
+
+async function handleEndAll(interaction) {
+    await InteractionHelper.safeDefer(interaction);
+
+    const giveaways = await getGuildGiveaways(interaction.client, interaction.guildId);
+    const activeGiveaways = giveaways.filter(g => !g.isEnded && !g.ended);
+
+    if (activeGiveaways.length === 0) {
+        return await InteractionHelper.safeEditReply(interaction, {
+            embeds: [
+                errorEmbed('No active giveaways to end.')
+            ],
+            flags: MessageFlags.Ephemeral,
+        });
+    }
+
+    const results = {
+        successful: [],
+        failed: []
+    };
+
+    logger.info(`Starting to end all ${activeGiveaways.length} active giveaways...`);
+
+    for (let i = 0; i < activeGiveaways.length; i++) {
+        try {
+            const giveaway = activeGiveaways[i];
+
+            const endResult = await endGiveawayService(
+                interaction.client,
+                giveaway,
+                interaction.guildId,
+                interaction.user.id
+            );
+
+            const updatedGiveaway = endResult.giveaway;
+            const winners = endResult.winners;
+
+            const channel = await interaction.client.channels.fetch(
+                updatedGiveaway.channelId,
+            ).catch(() => null);
+
+            if (channel && channel.isTextBased()) {
+                const message = await channel.messages.fetch(giveaway.messageId).catch(() => null);
+
+                if (message) {
+                    const newEmbed = createGiveawayEmbed(updatedGiveaway, 'ended', winners);
+                    const newRow = createGiveawayButtons(true);
+
+                    await message.edit({
+                        content: '🎉 **GIVEAWAY ENDED** 🎉',
+                        embeds: [newEmbed],
+                        components: [newRow],
+                    });
+
+                    if (winners.length > 0) {
+                        const winnerMentions = winners.map((id) => `<@${id}>`).join(',');
+                        await channel.send({
+                            content: `🎉 CONGRATULATIONS ${winnerMentions}! You won the **${updatedGiveaway.prize}** giveaway! Please contact the host <@${updatedGiveaway.hostId}> to claim your prize.`
+                        });
+                    } else {
+                        await channel.send({
+                            content: `The giveaway for **${updatedGiveaway.prize}** has ended with no valid entries.`,
+                        });
+                    }
+                }
+            }
+
+            await saveGiveaway(
+                interaction.client,
+                interaction.guildId,
+                updatedGiveaway,
+            );
+
+            results.successful.push({
+                prize: giveaway.prize,
+                winners: endResult.winners.length
+            });
+
+            logger.info(`Ended giveaway ${i + 1}/${activeGiveaways.length}: ${giveaway.prize}`);
+
+            // Small delay between ending giveaways
+            if (i < activeGiveaways.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        } catch (error) {
+            logger.error(`Failed to end giveaway ${i + 1}/${activeGiveaways.length}:`, error);
+            results.failed.push({
+                error: error.message,
+                index: i + 1
+            });
+        }
+    }
+
+    const summaryLines = [
+        `✅ **Successfully ended:** ${results.successful.length} giveaway(s)`,
+        results.successful.length > 0 ? `\n${results.successful.map(r => `• **${r.prize}** - ${r.winners} winner(s)`).join('\n')}` : '',
+        results.failed.length > 0 ? `\n❌ **Failed:** ${results.failed.length} giveaway(s)` : '',
+        results.failed.length > 0 ? `${results.failed.map(r => `• Error on giveaway ${r.index}`).join('\n')}` : ''
+    ].filter(Boolean).join('\n');
+
+    await InteractionHelper.safeEditReply(interaction, {
+        embeds: [
+            successEmbed(
+                '🎉 All Giveaways Ended!',
+                summaryLines,
+            ),
+        ],
+        flags: MessageFlags.Ephemeral,
+    });
+
+    logger.info(`Finished ending all giveaways. Successful: ${results.successful.length}, Failed: ${results.failed.length}`);
 }
 
 async function handleDelete(interaction) {
