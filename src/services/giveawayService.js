@@ -130,28 +130,55 @@ export function validateWinnerCount(winnerCount) {
 
 export function createGiveawayEmbed(giveaway, status, winners = []) {
     try {
-        const statusEmoji = status === 'ended' ? '🎉' : status === 'reroll' ? '🔄' : '🎉';
         const isEnded = status === 'ended' || status === 'reroll';
-        const color = isEnded ? getColor('giveaway.ended') : getColor('giveaway.active');
+        const darkRed = '#8B0000';
         
         const embed = new EmbedBuilder()
-            .setTitle(`${statusEmoji} ${giveaway.prize}`)
-            .setDescription('React with the button below to enter!')
-            .setColor(color)
+            .setColor(darkRed)
+            .setTitle('🎫 NEW GIVEAWAY')
+            .setDescription('JOIN • COMPETE • WIN')
             .addFields(
-                { name: '👤 Hosted by', value: `<@${giveaway.hostId}>`, inline: true },
-                { name: '🏆 Winners', value: giveaway.winnerCount.toString(), inline: true },
-                { name: '👥 Entries', value: giveaway.participants?.length?.toString() || '0', inline: true }
+                {
+                    name: '💰 PRIZE POOL',
+                    value: `**${giveaway.prize}**`,
+                    inline: false
+                },
+                {
+                    name: '👥 HOSTED BY',
+                    value: `<@${giveaway.hostId}>`,
+                    inline: true
+                },
+                {
+                    name: '🏆 WINNERS',
+                    value: giveaway.winnerCount.toString(),
+                    inline: true
+                }
             );
 
         if (isEnded) {
             const winnerDisplay = winners.length > 0 
                 ? winners.map(id => `<@${id}>`).join(', ')
                 : 'No valid entries';
-            embed.addFields({ name: '🎯 Winners', value: winnerDisplay, inline: false });
+            embed.addFields({ 
+                name: '🎯 WINNERS', 
+                value: winnerDisplay, 
+                inline: false 
+            });
+            embed.setTitle('🎉 GIVEAWAY ENDED');
         } else {
             const endTime = giveaway.endsAt || giveaway.endTime;
-            embed.addFields({ name: '⏰ Ends', value: `<t:${Math.floor(endTime / 1000)}:R>`, inline: false });
+            embed.addFields(
+                { 
+                    name: '⏰ ENDS', 
+                    value: `<t:${Math.floor(endTime / 1000)}:R>`, 
+                    inline: true 
+                },
+                { 
+                    name: '👥 ENTRIES', 
+                    value: (giveaway.participants?.length || 0).toString(), 
+                    inline: true 
+                }
+            );
         }
 
         embed.setTimestamp();
@@ -189,13 +216,13 @@ export function createGiveawayButtons(ended = false) {
             row.addComponents(
                 new ButtonBuilder()
                     .setCustomId('giveaway_join')
-                    .setLabel('🎉 Join')
-                    .setStyle(ButtonStyle.Primary)
+                    .setLabel('🎉 JOIN GIVEAWAY')
+                    .setStyle(ButtonStyle.Danger)
                     .setDisabled(false),
                 new ButtonBuilder()
                     .setCustomId('giveaway_end')
-                    .setLabel('🛑 End')
-                    .setStyle(ButtonStyle.Danger)
+                    .setLabel('⛔ END GIVEAWAY')
+                    .setStyle(ButtonStyle.Secondary)
                     .setDisabled(false)
             );
         }
