@@ -7,10 +7,11 @@ import {
   ButtonStyle,
   PermissionFlagsBits,
   AttachmentBuilder,
+  EmbedBuilder,
 } from 'discord.js';
 import { buildStandardLogEmbed, formatLogLine } from '../utils/logEmbeds.js';
 import { getGuildConfig } from './guildConfig.js';
-import { getTicketData, saveTicketData, deleteTicketData, getOpenTicketCountForUser, incrementTicketCounter } from '../utils/database.js';
+import { getTicketData, saveTicketData, deleteTicketData, getOpenTicketCountForUser, incrementTicketCounter, hasOpenTicketOfType } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
 import { createEmbed, errorEmbed } from '../utils/embeds.js';
 import { logTicketEvent } from '../utils/ticketLogging.js';
@@ -774,7 +775,7 @@ function escapeHtml(text) {
     .replace(/'/g, '&#039;');
 }
 
-async function generateTranscript(channel) {
+export async function generateTranscript(channel) {
   try {
     logger.debug('Generating transcript for channel', {
       channelId: channel.id,
@@ -1251,5 +1252,327 @@ export async function updateTicketPriority(channel, priority, updater) {
       error: typedError.userMessage || typedError.message,
       errorCode: typedError.context?.errorCode
     };
+  }
+}
+
+// ─── DM V1 ticket panel helpers ─────────────────────────────────────────────
+
+/**
+ * Sanitises a Discord username so it can be used as part of a channel name.
+ * Keeps only lowercase alphanumeric characters and hyphens (max 32 chars).
+ * @param {string} username
+ * @returns {string}
+ */
+function sanitiseChannelUsername(username) {
+  return String(username || 'user')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 32) || 'user';
+}
+
+/**
+ * Create a DM V1 typed ticket channel with branded welcome embed.
+ *
+ * @param {import('discord.js').Guild} guild
+ * @param {import('discord.js').GuildMember} member
+ * @param {object} typeConfig - Entry from DMV1_TICKET_TYPES in ticketPanelButtons.js
+ * @param {Record<string,string>} formData - Values collected via the modal
+ * @returns {Promise<{success: boolean, channel?: TextChannel, error?: string}>}
+ */
+export async function createDMV1Ticket(guild, member, typeConfig, formData) {
+  let channel = null;
+
+  try {
+    const config = await getGuildConfig(guild.client, guild.id);
+
+    // ── Duplicate prevention ──────────────────────────────────────────────────
+    const alreadyOpen = await hasOpenTicketOfType(guild.id, member.id, typeConfig.id);
+    if (alreadyOpen) {
+      return {
+        success: false,
+        error: `You already have an open **${typeConfig.label}** ticket. Please close it before opening another.`,
+      };
+    }
+
+    // ── Category resolution (reuse the guild's configured open category) ──────
+    const categoryId = config.ticketCategoryId || null;
+    let category = null;
+
+    if (categoryId) {
+      category = guild.channels.cache.get(categoryId) ||
+        await guild.channels.fetch(categoryId).catch(() => null);
+      if (category && category.type !== ChannelType.GuildCategory) {
+        category = null;
+      }
+    }
+
+    if (!category) {
+      category = guild.channels.cache.find(c =>
+        c.type === ChannelType.GuildCategory &&
+        c.name.toLowerCase().includes('ticket')
+      ) || null;
+    }
+
+    if (!category) {
+      category = await guild.channels.create({
+        name: 'Tickets',
+        type: ChannelType.GuildCategory,
+        permissionOverwrites: [{ id: guild.id, deny: [PermissionFlagsBits.ViewChannel] }],
+      });
+    }
+
+    // ── Channel name: ticket-{typeSuffix}-{username} ──────────────────────────
+    const cleanUsername = sanitiseChannelUsername(member.user.username);
+    const channelName = `ticket-${typeConfig.channelSuffix}-${cleanUsername}`.slice(0, 100);
+
+    // ── Create channel with correct permissions ───────────────────────────────
+    const permissionOverwrites = [
+      { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+      {
+        id: member.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.AttachFiles,
+          PermissionFlagsBits.ReadMessageHistory,
+        ],
+      },
+    ];
+
+    if (config.ticketStaffRoleId) {
+      permissionOverwrites.push({
+        id: config.ticketStaffRoleId,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.AttachFiles,
+          PermissionFlagsBits.ReadMessageHistory,
+          PermissionFlagsBits.ManageMessages,
+        ],
+      });
+    }
+
+    channel = await guild.channels.create({
+      name: channelName,
+      type: ChannelType.GuildText,
+      parent: category.id,
+      permissionOverwrites,
+    });
+
+    // ── Persist ticket data ───────────────────────────────────────────────────
+    const ticketNumber = await incrementTicketCounter(guild.id);
+
+    const ticketData = {
+      id: channel.id,
+      ticketNumber,
+      userId: member.id,
+      guildId: guild.id,
+      ticketType: typeConfig.id,
+      ticketLabel: typeConfig.label,
+      createdAt: new Date().toISOString(),
+      status: 'open',
+      claimedBy: null,
+      priority: 'none',
+      reason: `${typeConfig.emoji} ${typeConfig.label}`,
+      formData,
+    };
+
+    await saveTicketData(guild.id, channel.id, ticketData);
+
+    // ── Build DM V1 welcome embed ─────────────────────────────────────────────
+    const formLines = typeConfig.formFields
+      .map(f => `**${f.label}:** ${formData[f.id] || '—'}`)
+      .join('\n');
+
+    const embed = new EmbedBuilder()
+      .setColor(0x8B0000)
+      .setTitle(`${typeConfig.emoji} ${typeConfig.label} Ticket`)
+      .setDescription(
+        `${member.toString()}, your ticket has been created!\n\n` +
+        `${typeConfig.instructions}\n\n` +
+        `**Your details:**\n${formLines}\n\n` +
+        `☠️ A staff member will be with you shortly.\n` +
+        `*Staff role:* ${config.ticketStaffRoleId ? `<@&${config.ticketStaffRoleId}>` : 'Staff'}`,
+      )
+      .addFields(
+        { name: 'Ticket Type', value: `${typeConfig.emoji} ${typeConfig.label}`, inline: true },
+        { name: 'Opened by', value: member.toString(), inline: true },
+        { name: 'Status', value: '🟢 Open', inline: true },
+      );
+
+    // ── DM V1 control buttons ─────────────────────────────────────────────────
+    const controlRow1 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('dmv1_ticket_resolve')
+        .setLabel('Mark Resolved')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('✅'),
+      new ButtonBuilder()
+        .setCustomId('ticket_close')
+        .setLabel('Close Ticket')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🔒'),
+      new ButtonBuilder()
+        .setCustomId('dmv1_ticket_transcript')
+        .setLabel('Transcript')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('📝'),
+      new ButtonBuilder()
+        .setCustomId('ticket_delete')
+        .setLabel('Delete Ticket')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🗑️'),
+    );
+
+    const staffMention = config.ticketStaffRoleId
+      ? ` <@&${config.ticketStaffRoleId}>`
+      : '';
+    const content = `${member.toString()}${staffMention}`;
+
+    const ticketMessage = await channel.send({
+      content,
+      embeds: [embed],
+      components: [controlRow1],
+    });
+
+    await ticketMessage.pin().catch(err => {
+      logger.warn(`Could not pin DM V1 ticket message: ${err.message}`);
+    });
+
+    // ── Log the creation ──────────────────────────────────────────────────────
+    await logTicketEvent({
+      client: guild.client,
+      guildId: guild.id,
+      event: {
+        type: 'open',
+        ticketId: channel.id,
+        ticketNumber,
+        userId: member.id,
+        executorId: member.id,
+        reason: `${typeConfig.emoji} ${typeConfig.label}`,
+        priority: 'none',
+        metadata: {
+          channelId: channel.id,
+          categoryName: category?.name || 'Default',
+          ticketType: typeConfig.id,
+        },
+      },
+    });
+
+    logger.info('DM V1 ticket created successfully', {
+      guildId: guild.id,
+      channelId: channel.id,
+      userId: member.id,
+      ticketType: typeConfig.id,
+      ticketNumber,
+    });
+
+    return { success: true, channel, ticketData };
+
+  } catch (error) {
+    logger.error('Error creating DM V1 ticket:', {
+      guildId: guild?.id,
+      userId: member?.id,
+      channelId: channel?.id,
+      error: error.message,
+      stack: error.stack,
+    });
+
+    if (channel) {
+      await channel.delete('DM V1 ticket creation failed — cleaning up').catch(() => {});
+    }
+
+    const typedError = ensureTypedServiceError(error, {
+      service: 'ticketService',
+      operation: 'createDMV1Ticket',
+      message: 'Ticket operation failed: createDMV1Ticket',
+      userMessage: 'Failed to create ticket. Please try again.',
+      context: { guildId: guild?.id, userId: member?.id },
+    });
+
+    return {
+      success: false,
+      error: typedError.userMessage || typedError.message,
+    };
+  }
+}
+
+/**
+ * Mark a ticket as resolved — equivalent to closing with a "Resolved" reason.
+ * @param {import('discord.js').TextChannel} channel
+ * @param {import('discord.js').User} resolver
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function resolveTicket(channel, resolver) {
+  return closeTicket(channel, resolver, 'Resolved by staff');
+}
+
+/**
+ * Generate and send a transcript for a ticket to the configured transcript channel.
+ * The transcript HTML file is also sent directly as a reply in the current channel.
+ * @param {import('discord.js').TextChannel} channel
+ * @param {import('discord.js').User} requester
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function transcriptTicket(channel, requester) {
+  try {
+    const ticketData = await getTicketData(channel.guild.id, channel.id);
+    if (!ticketData) {
+      return { success: false, error: 'This is not a ticket channel.' };
+    }
+
+    const attachment = await generateTranscript(channel);
+    if (!attachment) {
+      return { success: false, error: 'Failed to generate transcript.' };
+    }
+
+    // Send to configured transcript channel
+    const guildConfig = await getGuildConfig(channel.client, channel.guild.id);
+    const transcriptChannelId = guildConfig.ticketTranscriptChannelId || guildConfig.ticketLogsChannelId;
+
+    if (transcriptChannelId) {
+      const transcriptChannel = await channel.client.channels.fetch(transcriptChannelId).catch(() => null);
+      if (transcriptChannel?.isSendable()) {
+        const transcriptEmbed = buildStandardLogEmbed({
+          color: 0x3498db,
+          title: 'Ticket Transcript',
+          description: [
+            formatLogLine('Ticket', `#${ticketData.ticketNumber || ticketData.id}`),
+            formatLogLine('Type', ticketData.ticketLabel || ticketData.reason || 'N/A'),
+            formatLogLine('Channel', `#${channel.name}`),
+            formatLogLine('Requested by', `<@${requester.id}>`),
+            formatLogLine('Generated', `<t:${Math.floor(Date.now() / 1000)}:F>`),
+          ].join('\n'),
+        });
+
+        await transcriptChannel.send({ embeds: [transcriptEmbed], files: [attachment] });
+      }
+    }
+
+    // Also send in the current ticket channel so staff can download it
+    await channel.send({
+      content: `📝 Transcript generated by ${requester.toString()}`,
+      files: [attachment],
+    });
+
+    await logTicketEvent({
+      client: channel.client,
+      guildId: channel.guild.id,
+      event: {
+        type: 'transcript',
+        ticketId: channel.id,
+        ticketNumber: ticketData.ticketNumber || ticketData.id,
+        userId: ticketData.userId,
+        executorId: requester.id,
+        metadata: { channelId: channel.id },
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    logger.error('Error generating transcript:', { channelId: channel.id, error: error.message });
+    return { success: false, error: 'An error occurred while generating the transcript.' };
   }
 }

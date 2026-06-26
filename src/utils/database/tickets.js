@@ -126,6 +126,55 @@ async function listGuildTickets(guildId) {
     return tickets;
 }
 
+/**
+ * Check if a user already has an open ticket of a specific DM V1 ticket type.
+ * @param {string} guildId
+ * @param {string} userId
+ * @param {string} ticketType - e.g. 'gold_deposit', 'rank_purchase'
+ * @returns {Promise<boolean>}
+ */
+export async function hasOpenTicketOfType(guildId, userId, ticketType) {
+    try {
+        if (!db.initialized) {
+            await db.initialize();
+        }
+
+        if (db.db?.pool && typeof db.db.isAvailable === 'function' && db.db.isAvailable()) {
+            const { pgConfig } = await import('../../config/postgres.js');
+            const result = await db.db.pool.query(
+                `SELECT COUNT(*)::int AS count FROM ${pgConfig.tables.tickets}
+                 WHERE guild_id = $1
+                   AND data->>'userId' = $2
+                   AND data->>'status' = 'open'
+                   AND data->>'ticketType' = $3`,
+                [guildId, userId, ticketType],
+            );
+            return Number(result.rows?.[0]?.count || 0) > 0;
+        }
+
+        if (typeof db.list === 'function') {
+            const ticketKeys = await db.list(`guild:${guildId}:ticket:`);
+            for (const key of ticketKeys) {
+                if (key.endsWith(':counter')) continue;
+                const ticket = await getFromDb(key, null);
+                if (
+                    ticket &&
+                    ticket.userId === userId &&
+                    ticket.status === 'open' &&
+                    ticket.ticketType === ticketType
+                ) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    } catch (error) {
+        logger.error(`Error checking open ticket by type for user ${userId}:`, error);
+        return false;
+    }
+}
+
 export async function getGuildTicketStats(guildId) {
     try {
         const tickets = await listGuildTickets(guildId);
