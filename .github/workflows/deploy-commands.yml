@@ -1,0 +1,38 @@
+name: Deploy Discord Slash Commands
+
+on:
+  workflow_dispatch:
+    inputs:
+      multi_guild:
+        description: 'Register globally (takes ~1 hour) instead of guild-only'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  deploy:
+    name: Register slash commands with Discord
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Deploy slash commands
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          GUILD_ID: ${{ secrets.GUILD_ID }}
+          MULTI_GUILD: ${{ github.event.inputs.multi_guild }}
+        run: node deploy-commands.js

@@ -94,6 +94,28 @@ export function parseDuration(durationString) {
     return ms;
 }
 
+export function validateWinnerCount(winnerCount) {
+    if (!Number.isInteger(winnerCount) || winnerCount < 1) {
+        throw new TitanBotError(
+            `Invalid winner count: ${winnerCount}`,
+            ErrorTypes.VALIDATION,
+            'Winner count must be a positive integer (minimum 1).',
+            { winnerCount }
+        );
+    }
+
+    if (winnerCount > 20) {
+        throw new TitanBotError(
+            `Winner count too large: ${winnerCount}`,
+            ErrorTypes.VALIDATION,
+            'Winner count cannot exceed 20.',
+            { winnerCount }
+        );
+    }
+
+    return winnerCount;
+}
+
 export function validatePrize(prize) {
     if (!prize || typeof prize !== 'string') {
         throw new TitanBotError(
