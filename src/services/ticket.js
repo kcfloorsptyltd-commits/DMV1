@@ -1279,7 +1279,7 @@ function sanitiseChannelUsername(username) {
  * @param {import('discord.js').GuildMember} member
  * @param {object} typeConfig - Entry from DMV1_TICKET_TYPES in ticketPanelButtons.js
  * @param {Record<string,string>} formData - Values collected via the modal
- * @returns {Promise<{success: boolean, channel?: TextChannel, error?: string}>}
+ * @returns {Promise<{success: boolean, channel?: import('discord.js').TextChannel, ticketData?: object, error?: string}>}
  */
 export async function createDMV1Ticket(guild, member, typeConfig, formData) {
   let channel = null;

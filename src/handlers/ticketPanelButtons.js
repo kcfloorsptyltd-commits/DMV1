@@ -283,9 +283,7 @@ export const dmv1TicketModalHandler = {
 
     } catch (error) {
       logger.error('Error creating DM V1 ticket from modal:', { error: error.message, userId: interaction.user.id });
-      if (!interaction.replied && !interaction.deferred) {
-        await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'An error occurred while creating your ticket.' });
-      } else if (interaction.deferred) {
+      if (!interaction.replied) {
         await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'An error occurred while creating your ticket.' });
       }
     }
@@ -326,9 +324,7 @@ export const dmv1TicketResolveHandler = {
 
     } catch (error) {
       logger.error('Error resolving DM V1 ticket:', { error: error.message });
-      if (!interaction.replied && !interaction.deferred) {
-        await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'An error occurred while resolving the ticket.' });
-      } else if (interaction.deferred) {
+      if (!interaction.replied) {
         await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'An error occurred while resolving the ticket.' });
       }
     }
@@ -365,9 +361,7 @@ export const dmv1TicketTranscriptHandler = {
 
     } catch (error) {
       logger.error('Error generating DM V1 ticket transcript:', { error: error.message });
-      if (!interaction.replied && !interaction.deferred) {
-        await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'An error occurred while generating the transcript.' });
-      } else if (interaction.deferred) {
+      if (!interaction.replied) {
         await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'An error occurred while generating the transcript.' });
       }
     }
