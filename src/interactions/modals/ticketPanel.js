@@ -248,9 +248,9 @@ async function handleModalSubmit(interaction, client, modalId, fields) {
   }
 
   // ── Create channel ────────────────────────────────────────────────────────
+  const openedAt = new Date().toISOString();
   let ticketChannel;
   try {
-    const openedAt = new Date().toISOString();
     ticketChannel = await guild.channels.create({
       name: channelPrefix,
       type: ChannelType.GuildText,
@@ -310,7 +310,7 @@ async function handleModalSubmit(interaction, client, modalId, fields) {
         { name: 'Type', value: def.label, inline: true },
         { name: 'Created by', value: `<@${user.id}> (${user.tag})`, inline: true },
         { name: 'Channel', value: `<#${ticketChannel.id}>`, inline: true },
-        { name: 'Opened At', value: new Date().toISOString(), inline: true },
+        { name: 'Opened At', value: openedAt, inline: true },
       )
       .setTimestamp();
 
