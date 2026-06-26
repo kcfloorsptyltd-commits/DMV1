@@ -92,7 +92,6 @@ export default {
         // Support both new array format and legacy single-username format
         let linkedUsernames = [];
         let pendingUsernames = [];
-        let declinedUsernames = [];
 
         if (rawLinks && Array.isArray(rawLinks.osrsUsernames)) {
             // New multi-RSN format
@@ -101,9 +100,8 @@ export default {
                     linkedUsernames.push(entry.username);
                 } else if (entry.status === OSRS_LINK_STATUSES.PENDING) {
                     pendingUsernames.push(entry.username);
-                } else if (entry.status === OSRS_LINK_STATUSES.DECLINED) {
-                    declinedUsernames.push(entry.username);
                 }
+                // Declined statuses are not shown on profile
             }
         } else if (rawLinks) {
             // Legacy single-username format
@@ -113,9 +111,8 @@ export default {
                 linkedUsernames = normalizeLinkedOsrsUsernames(rawLinks);
             } else if (status === OSRS_LINK_STATUSES.PENDING) {
                 pendingUsernames = rawLinks.osrsUsername ? [rawLinks.osrsUsername] : [];
-            } else if (status === OSRS_LINK_STATUSES.DECLINED) {
-                declinedUsernames = rawLinks.osrsUsername ? [rawLinks.osrsUsername] : [];
             }
+            // Declined statuses are not shown on profile
         }
 
         const economyData = await getEconomyData(client, guildId, targetUser.id);
@@ -134,10 +131,9 @@ export default {
         const userDisplayName = targetUser.username || targetUser.globalName || 'Unknown User';
 
         let linkedRsnsValue = buildLinkedRsnsValue(linkedUsernames);
-        if (pendingUsernames.length > 0 || declinedUsernames.length > 0) {
+        if (pendingUsernames.length > 0) {
             const statusLines = [];
             for (const u of pendingUsernames) statusLines.push(`🟡 ${u} — Pending approval`);
-            for (const u of declinedUsernames) statusLines.push(`❌ ${u} — Declined`);
             if (linkedUsernames.length > 0) {
                 linkedRsnsValue = `${buildLinkedRsnsValue(linkedUsernames)}\n${statusLines.join('\n')}`;
             } else {
