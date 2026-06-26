@@ -8,6 +8,8 @@ import createTicketHandler, {
   deleteTicketHandler,
   linkRsnButtonHandler,
   unlinkRsnButtonHandler,
+  linkRsnModalHandler,
+  unlinkRsnModalHandler,
 } from '../../handlers/ticketButtons.js';
 
 export default [
@@ -21,4 +23,6 @@ export default [
   deleteTicketHandler,
   linkRsnButtonHandler,
   unlinkRsnButtonHandler,
+  linkRsnModalHandler,
+  unlinkRsnModalHandler,
 ];
