@@ -23,7 +23,7 @@ import { logger } from '../../utils/logger.js';
 import { getGuildConfig } from '../../services/guildConfig.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 
-// ─── Configuration ────────────────────────────────────────────────────────────
+// ─── Configuration ────────────────────────────────────────────────────────
 
 const EMBED_COLOR = 0x8B0000; // Dark red — DMV1 medieval theme
 
@@ -41,13 +41,12 @@ const TICKET_META = {
   },
   ticket_modal_gold_withdrawal: {
     key: 'gold-withdrawal',
-    label: '💸 Gold Withdrawal',
+    label: '💸 DM Coin Withdrawal',
     instructions:
       '**A staff member will be with you shortly.**\n\n' +
       'Please ensure:\n' +
       '• Your RSN is correct\n' +
-      '• The withdrawal amount matches your balance\n' +
-      '• You have provided a valid payment method\n\n' +
+      '• The withdrawal amount is accurate\n\n' +
       '> ⚠️ Never share your password with staff.',
   },
   ticket_modal_gp_purchase: {
@@ -103,7 +102,7 @@ const TICKET_META = {
   },
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────
 
 /** Sanitise a value for use inside a Discord channel name. */
 function sanitizeForChannelName(str) {
@@ -366,8 +365,6 @@ const goldDepositModal = makeModalHandler('ticket_modal_gold_deposit', (i) => ({
 const goldWithdrawalModal = makeModalHandler('ticket_modal_gold_withdrawal', (i) => ({
   RSN: i.fields.getTextInputValue('rsn'),
   Amount: i.fields.getTextInputValue('amount'),
-  'Payment Method': i.fields.getTextInputValue('payment_method'),
-  Notes: i.fields.getTextInputValue('notes') || 'None',
 }));
 
 const gpPurchaseModal = makeModalHandler('ticket_modal_gp_purchase', (i) => ({
