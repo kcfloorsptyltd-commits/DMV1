@@ -12,7 +12,7 @@ export default {
     data: new SlashCommandBuilder()
         .setName("ticket")
         .setDescription("Manages the server's ticket system.")
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .addSubcommand((subcommand) =>
             subcommand
                 .setName("setup")
@@ -90,7 +90,8 @@ export default {
             subcommand
                 .setName("dashboard")
                 .setDescription("Open the interactive ticket system dashboard"),
-        ),
+        )
+        .setDMPermission(false),
     category: "ticket",
 
     async execute(interaction, config, client) {

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { infoEmbed, successEmbed } from '../../utils/embeds.js';
 import { withErrorHandling } from '../../utils/errorHandler.js';
 import { verifyUser } from '../../services/verificationService.js';
@@ -8,7 +8,9 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 export default {
     data: new SlashCommandBuilder()
         .setName('verify')
-        .setDescription('Verify yourself and gain access to the server'),
+        .setDescription('Verify yourself and gain access to the server')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     async execute(interaction, config, client) {
         const wrappedExecute = withErrorHandling(async () => {

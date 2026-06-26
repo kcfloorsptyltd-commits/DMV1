@@ -10,7 +10,8 @@ export default {
     data: new SlashCommandBuilder()
         .setName("claim")
         .setDescription("Claims an open ticket, assigning it to you.")
-        .setDMPermission(false),
+        .setDMPermission(false)
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
     async execute(interaction, guildConfig, client) {
         try {

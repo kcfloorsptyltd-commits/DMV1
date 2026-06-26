@@ -14,7 +14,8 @@ export default {
             subcommand
                 .setName('dashboard')
                 .setDescription('Open the welcome & goodbye configuration dashboard'),
-        ),
+        )
+        .setDMPermission(false),
 
     async execute(interaction, config, client) {
         try {

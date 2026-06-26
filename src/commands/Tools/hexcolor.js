@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { createEmbed, successEmbed, infoEmbed, warningEmbed } from '../../utils/embeds.js';
 import { logger } from '../../utils/logger.js';
 import { getColor } from '../../config/bot.js';
@@ -11,7 +11,9 @@ export default {
         .addStringOption(option =>
             option.setName('color')
                 .setDescription('Specific hex color (e.g., #FF5733 or FF5733)')
-                .setRequired(false)),
+                .setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     async execute(interaction) {
         await InteractionHelper.safeExecute(

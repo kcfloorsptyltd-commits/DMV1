@@ -29,7 +29,8 @@ export default {
                 .setMaxValue(7)
                 .setRequired(false)
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
     category: "moderation",
     abuseProtection: { maxAttempts: 3, windowMs: 60_000 },
 

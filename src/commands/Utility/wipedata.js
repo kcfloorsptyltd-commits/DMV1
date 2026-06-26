@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { createEmbed, errorEmbed, warningEmbed } from '../../utils/embeds.js';
 import { getConfirmationButtons } from '../../utils/components.js';
 import { logger } from '../../utils/logger.js';
@@ -9,7 +9,9 @@ export default {
     slashOnly: true,
     data: new SlashCommandBuilder()
         .setName('wipedata')
-        .setDescription('Delete all your personal data from the bot (irreversible)'),
+        .setDescription('Delete all your personal data from the bot (irreversible)')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     async execute(interaction, guildConfig, client) {
         try {

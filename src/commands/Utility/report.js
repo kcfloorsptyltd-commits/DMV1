@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChannelType } from 'discord.js';
+import { SlashCommandBuilder, ChannelType, PermissionFlagsBits } from 'discord.js';
 import { logger } from '../../utils/logger.js';
 import { handleInteractionError } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -40,7 +40,8 @@ export default {
                         .addChannelTypes(ChannelType.GuildText)
                         .setRequired(true),
                 ),
-        ),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
     category: 'Utility',
 
     async execute(interaction, config, client) {

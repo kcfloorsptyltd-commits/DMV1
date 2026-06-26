@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { createEmbed, successEmbed, infoEmbed, warningEmbed } from '../../utils/embeds.js';
 import { logger } from '../../utils/logger.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -10,7 +10,9 @@ export default {
         .addStringOption(option =>
             option.setName('timezone')
                 .setDescription('The timezone to display (e.g., UTC, America/New_York)')
-                .setRequired(false)),
+                .setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     async execute(interaction) {
         await InteractionHelper.safeExecute(

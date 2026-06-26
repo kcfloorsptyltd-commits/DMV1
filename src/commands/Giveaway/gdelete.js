@@ -18,7 +18,8 @@ export default {
                 .setDescription("The message ID of the giveaway to delete.")
                 .setRequired(true),
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     async execute(interaction) {
         try {

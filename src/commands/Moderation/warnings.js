@@ -16,7 +16,8 @@ export default {
                 .setRequired(true)
                 .setDescription("User to check warnings for"),
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
     category: "moderation",
 
     async execute(interaction, config, client) {

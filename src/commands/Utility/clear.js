@@ -1,10 +1,12 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { errorEmbed, createEmbed } from '../../utils/embeds.js';
 
 export default {
     data: new SlashCommandBuilder()
         .setName('clear')
-        .setDescription('Clear all messages from a channel'),
+        .setDescription('Clear all messages from a channel')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     execute: async (interaction, _config, client) => {
         try {

@@ -27,7 +27,7 @@ export default {
                 .setDescription("Send the message anonymously (default: false)")
                 .setRequired(false)
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .setDMPermission(false),
     category: "moderation",
 

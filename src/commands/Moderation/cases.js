@@ -7,7 +7,7 @@ export default {
     data: new SlashCommandBuilder()
         .setName('cases')
         .setDescription('View moderation cases and audit logs')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ViewAuditLog)
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .setDMPermission(false)
         .addStringOption(option =>
             option.setName('filter')

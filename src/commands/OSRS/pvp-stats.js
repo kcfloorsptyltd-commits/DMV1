@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { createEmbed } from '../../utils/embeds.js';
 import { getPvpStats } from '../../utils/database/pvp.js';
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -14,7 +14,9 @@ export default {
                 .setName('player')
                 .setDescription('The player name to look up (leave blank for your own Discord username)')
                 .setRequired(false),
-        ),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     execute: withErrorHandling(async (interaction, _config, _client) => {
         const deferred = await InteractionHelper.safeDefer(interaction);

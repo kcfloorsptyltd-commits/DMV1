@@ -29,7 +29,9 @@ export default {
               { name: 'bank', value: 'bank' }
             )
         )
-    ),
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDMPermission(false),
 
   execute: withErrorHandling(async (interaction, config, client) => {
     // permission check: require Manage Guild or Administrator

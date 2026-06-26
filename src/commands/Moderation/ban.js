@@ -18,7 +18,8 @@ export default {
         .addStringOption((option) =>
             option.setName("reason").setDescription("Reason for the ban"),
         )
-.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+.setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
     category: "moderation",
 
     async execute(interaction, config, client) {

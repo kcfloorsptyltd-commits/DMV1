@@ -1052,7 +1052,8 @@ export default {
     data: new SlashCommandBuilder()
         .setName('embedbuilder')
         .setDescription('Build and post a fully custom embed with live preview')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     async execute(interaction) {
         try {

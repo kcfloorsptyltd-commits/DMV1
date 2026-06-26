@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } from 'discord.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -6,7 +6,9 @@ dotenv.config();
 export default {
     data: new SlashCommandBuilder()
         .setName('ticket-panel')
-        .setDescription('Send the DM V1 support & services ticket panel'),
+        .setDescription('Send the DM V1 support & services ticket panel')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     async execute(interaction) {
         try {

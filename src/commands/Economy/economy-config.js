@@ -131,7 +131,8 @@ export default {
             sub
                 .setName('dashboard')
                 .setDescription('View and manage economy configuration')
-        ),
+        )
+        .setDMPermission(false),
 
     execute: withErrorHandling(async (interaction, config, client) => {
         const subcommand = interaction.options.getSubcommand();

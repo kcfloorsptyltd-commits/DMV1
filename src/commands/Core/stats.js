@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, version, MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, version, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { createEmbed } from '../../utils/embeds.js';
 import { logger } from '../../utils/logger.js';
 
@@ -6,7 +6,9 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 export default {
     data: new SlashCommandBuilder()
     .setName("stats")
-    .setDescription("View bot statistics"),
+    .setDescription("View bot statistics")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDMPermission(false),
 
   async execute(interaction) {
     try {

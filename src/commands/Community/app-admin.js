@@ -97,7 +97,8 @@ export default {
                     .setRequired(false)
                     .setAutocomplete(true),
             ),
-    ),
+    )
+    .setDMPermission(false),
 
     category: "Community",
 
