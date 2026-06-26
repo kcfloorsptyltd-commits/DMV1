@@ -24,6 +24,8 @@ export default {
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .setDMPermission(false),
 
+    category: 'Giveaway',
+
     async execute(interaction) {
         try {
             
