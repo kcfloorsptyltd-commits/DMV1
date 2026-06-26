@@ -33,10 +33,10 @@ const TICKET_TYPES = {
   },
   ticket_gold_withdrawal: {
     key: 'gold-withdrawal',
-    label: '💸 Gold Withdrawal',
+    label: '💸 DM Coin Withdrawal',
     modalId: 'ticket_modal_gold_withdrawal',
     instructions:
-      'Please provide your RSN, the amount you wish to withdraw, your preferred payment method, and any notes.',
+      'Please provide your RSN and the amount you wish to withdraw.',
   },
   ticket_gp_purchase: {
     key: 'gp-purchase',
@@ -80,7 +80,7 @@ const TICKET_TYPES = {
   },
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────
 
 /** Sanitise a string for use inside a Discord channel name (a–z, 0–9, -). */
 function sanitizeForChannelName(str) {
@@ -189,11 +189,7 @@ function makeTicketTypeHandler(buttonCustomId) {
           .setTitle(def.label.replace(/^[^ ]+ /, '')); // strip leading emoji for title
 
         // Fields vary per ticket type — modals can have at most 5 rows
-        if (
-          buttonCustomId === 'ticket_gold_deposit' ||
-          buttonCustomId === 'ticket_gold_withdrawal' ||
-          buttonCustomId === 'ticket_gp_purchase'
-        ) {
+        if (buttonCustomId === 'ticket_gold_deposit' || buttonCustomId === 'ticket_gp_purchase') {
           modal.addComponents(
             new ActionRowBuilder().addComponents(
               new TextInputBuilder()
@@ -227,6 +223,26 @@ function makeTicketTypeHandler(buttonCustomId) {
                 .setStyle(TextInputStyle.Paragraph)
                 .setRequired(false)
                 .setMaxLength(500),
+            ),
+          );
+        } else if (buttonCustomId === 'ticket_gold_withdrawal') {
+          // DM Coin Withdrawal — NO payment method field
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder()
+                .setCustomId('rsn')
+                .setLabel('Your RuneScape Name (RSN)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setMaxLength(12),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder()
+                .setCustomId('amount')
+                .setLabel('Amount to Withdraw')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setMaxLength(50),
             ),
           );
         } else if (buttonCustomId === 'ticket_balance_enquiry') {
