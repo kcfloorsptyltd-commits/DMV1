@@ -3,6 +3,7 @@ import { replyUserError, ErrorTypes } from '../utils/errorHandler.js';
 import { InteractionHelper } from '../utils/interactionHelper.js';
 import { logger } from '../utils/logger.js';
 import { linkOsrsUsername, unlinkSpecificOsrsUsername } from '../utils/database/osrs.js';
+import { isAuthorizedOsrsAdmin, getOsrsAdminPermissionError } from '../utils/osrsAdminAuth.js';
 
 const rsnLinkApproveHandler = {
   name: 'rsn_link_approve',
@@ -14,6 +15,18 @@ const rsnLinkApproveHandler = {
     if (!deferSuccess) return;
 
     try {
+      // Check if user is authorized to approve
+      if (!(await isAuthorizedOsrsAdmin(interaction, client))) {
+        await InteractionHelper.safeEditReply(interaction, {
+          embeds: [new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Permission Denied')
+            .setDescription(getOsrsAdminPermissionError('approve RSN link requests'))
+          ],
+        });
+        return;
+      }
+
       // Link the RSN to the user's profile
       const linkSuccess = await linkOsrsUsername(client, interaction.guildId, userId, rsn);
 
@@ -59,6 +72,18 @@ const rsnLinkDeclineHandler = {
     if (!deferSuccess) return;
 
     try {
+      // Check if user is authorized to decline
+      if (!(await isAuthorizedOsrsAdmin(interaction, client))) {
+        await InteractionHelper.safeEditReply(interaction, {
+          embeds: [new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Permission Denied')
+            .setDescription(getOsrsAdminPermissionError('decline RSN link requests'))
+          ],
+        });
+        return;
+      }
+
       const declineEmbed = new EmbedBuilder()
         .setColor(0xff0000)
         .setTitle('❌ RSN Link Declined')
@@ -76,10 +101,23 @@ const rsnLinkDeclineHandler = {
       // Close the ticket
       const channel = interaction.channel;
       if (channel && typeof channel.delete === 'function') {
-        setTimeout(() => {
-          channel.delete('RSN link request declined').catch((err) => {
-            logger.error('Error deleting ticket channel:', err);
-          });
+        setTimeout(async () => {
+          try {
+            // Fetch all messages in the channel and delete them before closing
+            const messages = await channel.messages.fetch({ limit: 100 });
+            for (const msg of messages.values()) {
+              try {
+                await msg.delete();
+              } catch (e) {
+                logger.debug('Could not delete message', { messageId: msg.id, error: e.message });
+              }
+            }
+            
+            // Close the ticket channel
+            await channel.delete('RSN link request declined');
+          } catch (err) {
+            logger.error('Error deleting ticket channel or messages:', err);
+          }
         }, 3000);
       }
 
@@ -106,6 +144,18 @@ const rsnUnlinkApproveHandler = {
     if (!deferSuccess) return;
 
     try {
+      // Check if user is authorized to approve
+      if (!(await isAuthorizedOsrsAdmin(interaction, client))) {
+        await InteractionHelper.safeEditReply(interaction, {
+          embeds: [new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Permission Denied')
+            .setDescription(getOsrsAdminPermissionError('approve RSN unlink requests'))
+          ],
+        });
+        return;
+      }
+
       // Unlink the RSN from the user's profile
       const unlinkSuccess = await unlinkSpecificOsrsUsername(client, interaction.guildId, userId, rsn);
 
@@ -151,6 +201,18 @@ const rsnUnlinkDeclineHandler = {
     if (!deferSuccess) return;
 
     try {
+      // Check if user is authorized to decline
+      if (!(await isAuthorizedOsrsAdmin(interaction, client))) {
+        await InteractionHelper.safeEditReply(interaction, {
+          embeds: [new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Permission Denied')
+            .setDescription(getOsrsAdminPermissionError('decline RSN unlink requests'))
+          ],
+        });
+        return;
+      }
+
       const declineEmbed = new EmbedBuilder()
         .setColor(0xff0000)
         .setTitle('❌ RSN Unlink Declined')
@@ -168,10 +230,23 @@ const rsnUnlinkDeclineHandler = {
       // Close the ticket
       const channel = interaction.channel;
       if (channel && typeof channel.delete === 'function') {
-        setTimeout(() => {
-          channel.delete('RSN unlink request declined').catch((err) => {
-            logger.error('Error deleting ticket channel:', err);
-          });
+        setTimeout(async () => {
+          try {
+            // Fetch all messages in the channel and delete them before closing
+            const messages = await channel.messages.fetch({ limit: 100 });
+            for (const msg of messages.values()) {
+              try {
+                await msg.delete();
+              } catch (e) {
+                logger.debug('Could not delete message', { messageId: msg.id, error: e.message });
+              }
+            }
+            
+            // Close the ticket channel
+            await channel.delete('RSN unlink request declined');
+          } catch (err) {
+            logger.error('Error deleting ticket channel or messages:', err);
+          }
         }, 3000);
       }
 
