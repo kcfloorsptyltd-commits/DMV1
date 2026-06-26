@@ -21,7 +21,7 @@ export default {
                     `**Need assistance? You're in the right place!**\n\n` +
                     `Please open a ticket for any of the following:\n\n` +
                     `💰 **Gold Deposits** - Open a ticket for gold deposits.\n` +
-                    `💸 **Gold Withdrawals** - Open a ticket for gold withdrawals.\n` +
+                    `💸 **DM Coin Withdrawals** - Open a ticket for DM coin withdrawals.\n` +
                     `🪙 **In-Game GP Purchases** - Get help with in-game GP purchases.\n` +
                     `📊 **Account & Balance Enquiries** - Account issues or balance enquiries.\n` +
                     `👥 **Clan Chat Access** - Request access to our clan chat.\n` +
@@ -37,7 +37,7 @@ export default {
                 ticketEmbed.setThumbnail(thumbnailUrl);
             }
 
-            // Button Row 1: Gold Deposit, Gold Withdrawal, GP Purchase, Balance Enquiry
+            // Button Row 1: Gold Deposit, DM Coin Withdrawal, GP Purchase, Balance Enquiry
             const row1 = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder()
@@ -47,7 +47,7 @@ export default {
                         .setEmoji('💰'),
                     new ButtonBuilder()
                         .setCustomId('ticket_gold_withdrawal')
-                        .setLabel('Gold Withdrawal')
+                        .setLabel('DM Coin Withdrawal')
                         .setStyle(ButtonStyle.Danger)
                         .setEmoji('💸'),
                     new ButtonBuilder()
