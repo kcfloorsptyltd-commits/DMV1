@@ -90,12 +90,12 @@ export default {
                     new ButtonBuilder()
                         .setCustomId('ticket_link_rsn')
                         .setLabel('Link RSN')
-                        .setStyle(ButtonStyle.Primary)
+                        .setStyle(ButtonStyle.Danger)
                         .setEmoji('🔗'),
                     new ButtonBuilder()
                         .setCustomId('ticket_unlink_rsn')
                         .setLabel('Unlink RSN')
-                        .setStyle(ButtonStyle.Primary)
+                        .setStyle(ButtonStyle.Danger)
                         .setEmoji('🔓'),
                 );
 
