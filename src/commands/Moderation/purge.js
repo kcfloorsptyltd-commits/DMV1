@@ -15,7 +15,8 @@ export default {
         .setDescription("Number of messages (1-100)")
         .setRequired(true),
     )
-.setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+.setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDMPermission(false),
   category: "moderation",
   abuseProtection: { maxAttempts: 5, windowMs: 60_000 },
 

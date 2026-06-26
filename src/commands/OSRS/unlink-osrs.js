@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { createEmbed, errorEmbed } from '../../utils/embeds.js';
 import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -10,7 +10,9 @@ const AUTO_DELETE_DELAY = 30000; // 30 seconds before removing the dropdown comp
 export default {
     data: new SlashCommandBuilder()
         .setName('unlink-osrs')
-        .setDescription('Request to unlink one of your OSRS usernames from your Discord account'),
+        .setDescription('Request to unlink one of your OSRS usernames from your Discord account')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     execute: withErrorHandling(async (interaction, _config, client) => {
         const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });

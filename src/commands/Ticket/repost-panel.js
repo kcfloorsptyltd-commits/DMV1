@@ -10,7 +10,7 @@ export default {
     data: new SlashCommandBuilder()
         .setName('repost-panel')
         .setDescription('Force repost the ticket panel with the latest design.')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .setDMPermission(false),
 
     async execute(interaction, config, client) {

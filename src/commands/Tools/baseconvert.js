@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { createEmbed, successEmbed, infoEmbed, warningEmbed } from '../../utils/embeds.js';
 import { logger } from '../../utils/logger.js';
 import { handleInteractionError, replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -111,7 +111,9 @@ export default {
             option.setName('to')
                 .setDescription('Target base/format (default: all)')
                 .setRequired(false)
-                .addChoices(...BASE_NAMES)),
+                .addChoices(...BASE_NAMES))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     async execute(interaction) {
         const deferSuccess = await InteractionHelper.safeDefer(interaction);

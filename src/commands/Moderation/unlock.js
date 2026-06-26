@@ -23,7 +23,9 @@ export default {
                 .setName('guild')
                 .setDescription('Optional guild ID for the target vault')
                 .setRequired(false),
-        ),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
     category: 'moderation',
 
     async execute(interaction, _config, client) {

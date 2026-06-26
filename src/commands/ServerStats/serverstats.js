@@ -13,7 +13,7 @@ export default {
     data: new SlashCommandBuilder()
         .setName("serverstats")
         .setDescription("Manage server statistics that track member counts and channel data")
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .addSubcommand(subcommand =>
             subcommand
                 .setName("create")
@@ -84,7 +84,8 @@ export default {
                         .setDescription("The ID of the tracker to delete")
                         .setRequired(true)
                 )
-        ),
+        )
+        .setDMPermission(false),
 
     async execute(interaction, guildConfig, client) {
         const subcommand = interaction.options.getSubcommand();

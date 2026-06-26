@@ -16,7 +16,8 @@ export default {
                 .setName("reason")
                 .setDescription("The reason for closing the ticket.")
                 .setRequired(false),
-        ),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
     async execute(interaction, guildConfig, client) {
         try {

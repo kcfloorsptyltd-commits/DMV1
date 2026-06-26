@@ -3,26 +3,12 @@ import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { Collection, PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
+import { isMemberAllowedCommand } from '../utils/memberCommandWhitelist.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const MAX_COMMANDS = 100;
 const COMMAND_COUNT_WARN_THRESHOLD = 90;
-
-// Public commands that should be visible to all users (not restricted to admin)
-const PUBLIC_COMMANDS = new Set([
-    'fight',
-    'fight-sim',
-    'accept-fight',
-    'decline-fight',
-    'fight-status',
-    'link-osrs',
-    'unlink-osrs',
-    'trade',
-    'balance',
-    'profile',
-    'unlock',
-]);
 
 function getSubcommandInfo(commandData) {
     const subcommands = [];
@@ -161,15 +147,15 @@ function collectCommandPayloads(client) {
 
         registeredNames.add(commandName);
         
-        // Apply admin-only permission flag to all commands except public ones
-        if (!PUBLIC_COMMANDS.has(commandName)) {
+        // Apply member visibility restrictions for commands outside the whitelist
+        if (!isMemberAllowedCommand(commandName)) {
             // Only add the permission flag if not already set by the command itself
             if (!command.data.default_member_permissions) {
-                command.data.setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
-                logger.debug(`Applied Administrator permission to command: ${commandName}`);
+                command.data.setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
+                logger.debug(`Applied ManageGuild permission to command: ${commandName}`);
             }
         } else {
-            logger.debug(`Keeping command public (no permission restriction): ${commandName}`);
+            logger.debug(`Keeping command visible to members: ${commandName}`);
         }
         
         const commandJson = command.data.toJSON();

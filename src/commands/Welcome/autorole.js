@@ -36,7 +36,8 @@ export default {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('list')
-                .setDescription('List all auto-assigned roles')),
+                .setDescription('List all auto-assigned roles'))
+        .setDMPermission(false),
 
     async execute(interaction) {
         const deferSuccess = await InteractionHelper.safeDefer(interaction);

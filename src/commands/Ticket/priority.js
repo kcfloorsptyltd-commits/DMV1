@@ -24,7 +24,8 @@ export default {
                     { name: "None", value: "none" },
                 ),
             )
-        .setDMPermission(false),
+        .setDMPermission(false)
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
     category: "Ticket",
 
     async execute(interaction, guildConfig, client) {

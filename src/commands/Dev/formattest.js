@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { createEmbed } from '../../utils/embeds.js';
 import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -7,7 +7,9 @@ import { formatCurrency } from '../../utils/economy.js';
 export default {
   data: new SlashCommandBuilder()
     .setName('formattest')
-    .setDescription('Dev: show economy formatting (gp) - for debugging'),
+    .setDescription('Dev: show economy formatting (gp) - for debugging')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDMPermission(false),
 
   execute: withErrorHandling(async (interaction, config, client) => {
     const deferred = await InteractionHelper.safeDefer(interaction);

@@ -18,7 +18,7 @@ export default {
     data: new SlashCommandBuilder()
         .setName('reactroles')
         .setDescription('Manage reaction role assignments')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .addSubcommand(subcommand =>
             subcommand
                 .setName('setup')
@@ -75,7 +75,8 @@ export default {
                         .setRequired(false)
                         .setAutocomplete(true)
                 )
-        ),
+        )
+        .setDMPermission(false),
 
     async execute(interaction) {
         const subcommand = interaction.options.getSubcommand();

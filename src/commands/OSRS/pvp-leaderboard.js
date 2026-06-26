@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { createEmbed } from '../../utils/embeds.js';
 import { getAllPvpStats } from '../../utils/database/pvp.js';
 import { withErrorHandling } from '../../utils/errorHandler.js';
@@ -10,7 +10,9 @@ const TOP_N = 10;
 export default {
     data: new SlashCommandBuilder()
         .setName('pvp-leaderboard')
-        .setDescription('Display the top PvP killers in the clan'),
+        .setDescription('Display the top PvP killers in the clan')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     execute: withErrorHandling(async (interaction, _config, _client) => {
         const deferred = await InteractionHelper.safeDefer(interaction);

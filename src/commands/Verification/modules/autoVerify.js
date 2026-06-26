@@ -19,6 +19,7 @@ export default {
         .setName("autoverify")
         .setDescription("Configure automatic verification settings")
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false)
         .addSubcommand(subcommand =>
             subcommand
                 .setName("setup")

@@ -8,7 +8,7 @@ export default {
         .setName("firstmsg")
         .setDescription("Get a link to the first message in this channel")
         .setDMPermission(false)
-        .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
     category: "Utility",
 
     async execute(interaction, config, client) {

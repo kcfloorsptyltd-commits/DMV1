@@ -60,7 +60,9 @@ export default {
             subcommand
                 .setName("dashboard")
                 .setDescription("Open the verification system configuration dashboard")
-        ),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     async execute(interaction, config, client) {
         const wrappedExecute = withErrorHandling(async () => {

@@ -131,7 +131,7 @@ export default {
                 )
         )
         .setDMPermission(false)
-        .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
     category: "Utility",
 
     async execute(interaction, config, client) {
