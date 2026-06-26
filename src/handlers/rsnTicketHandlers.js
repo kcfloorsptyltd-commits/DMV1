@@ -1,4 +1,4 @@
-import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from 'discord.js';
+import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { createTicket } from '../services/ticket.js';
 import { getGuildConfig } from '../services/guildConfig.js';
 import { replyUserError, ErrorTypes } from '../utils/errorHandler.js';
@@ -88,6 +88,37 @@ const linkRsnModalHandler = {
       );
 
       if (result.success && result.channel) {
+        // Create approval embed for staff
+        const approvalEmbed = new EmbedBuilder()
+          .setColor(0x8B0000)
+          .setTitle('🔗 RSN Link Request')
+          .setDescription(`<@${interaction.user.id}> is requesting to link **${rsn.trim()}**`)
+          .addFields(
+            { name: 'OSRS Username', value: rsn.trim(), inline: true },
+            { name: 'Discord User', value: `<@${interaction.user.id}>`, inline: true },
+            { name: 'Requested At', value: new Date().toLocaleString(), inline: false }
+          )
+          .setFooter({ text: 'DM V1 RSN Management' })
+          .setTimestamp();
+
+        // Create approval buttons
+        const approvalRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`rsn_link_approve:${interaction.user.id}:${rsn.trim()}`)
+            .setLabel('Approve')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId(`rsn_link_decline:${interaction.user.id}:${rsn.trim()}`)
+            .setLabel('Decline')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+        // Send approval message to ticket channel
+        await result.channel.send({
+          embeds: [approvalEmbed],
+          components: [approvalRow]
+        });
+
         const channelMention = `<#${result.channel.id}>`;
         await interaction.editReply({
           content: `✅ Your RSN link request has been created! Jump to it: ${channelMention}`,
@@ -127,6 +158,37 @@ const unlinkRsnModalHandler = {
       );
 
       if (result.success && result.channel) {
+        // Create approval embed for staff
+        const approvalEmbed = new EmbedBuilder()
+          .setColor(0x8B0000)
+          .setTitle('🔓 RSN Unlink Request')
+          .setDescription(`<@${interaction.user.id}> is requesting to unlink **${rsn.trim()}**`)
+          .addFields(
+            { name: 'OSRS Username', value: rsn.trim(), inline: true },
+            { name: 'Discord User', value: `<@${interaction.user.id}>`, inline: true },
+            { name: 'Requested At', value: new Date().toLocaleString(), inline: false }
+          )
+          .setFooter({ text: 'DM V1 RSN Management' })
+          .setTimestamp();
+
+        // Create approval buttons
+        const approvalRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`rsn_unlink_approve:${interaction.user.id}:${rsn.trim()}`)
+            .setLabel('Approve')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId(`rsn_unlink_decline:${interaction.user.id}:${rsn.trim()}`)
+            .setLabel('Decline')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+        // Send approval message to ticket channel
+        await result.channel.send({
+          embeds: [approvalEmbed],
+          components: [approvalRow]
+        });
+
         const channelMention = `<#${result.channel.id}>`;
         await interaction.editReply({
           content: `✅ Your RSN unlink request has been created! Jump to it: ${channelMention}`,
