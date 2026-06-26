@@ -6,13 +6,16 @@ dotenv.config();
 export default {
     data: new SlashCommandBuilder()
         .setName('ticket-panel')
-        .setDescription('Send the ticket support panel'),
+        .setDescription('Send the DM V1 support & services ticket panel'),
 
     async execute(interaction) {
         try {
+            const bannerUrl = process.env.BANNER_URL || 'https://i.imgur.com/ENlr2PM.png';
+            const thumbnailUrl = process.env.THUMBNAIL_URL || null;
+
             // DM V1 Ticket Panel Embed
             const ticketEmbed = new EmbedBuilder()
-                .setColor('#8B0000') // Dark red
+                .setColor('#8B0000') // Dark red — DMV1 medieval theme
                 .setTitle('🎫 SUPPORT & SERVICES TICKET')
                 .setDescription(
                     `**Need assistance? You're in the right place!**\n\n` +
@@ -26,10 +29,13 @@ export default {
                     `❓ **General Questions & Support** - General questions or support.\n` +
                     `📋 **Any Other Requests** - Any other issues or requests.`
                 )
-                .setImage('https://i.imgur.com/ENlr2PM.png') // Epic banner
-                .setThumbnail(process.env.THUMBNAIL_URL || 'https://cdn.discordapp.com/emojis/your-skull-emoji.png')
+                .setImage(bannerUrl)
                 .setFooter({ text: 'DM V1 Support • Fast. Secure. Trusted.' })
                 .setTimestamp();
+
+            if (thumbnailUrl) {
+                ticketEmbed.setThumbnail(thumbnailUrl);
+            }
 
             // Button Row 1: Gold Deposit, Gold Withdrawal, GP Purchase, Balance Enquiry
             const row1 = new ActionRowBuilder()
@@ -81,7 +87,7 @@ export default {
                         .setEmoji('📋'),
                 );
 
-            // Send the panel
+            // Send the panel to the current channel
             await interaction.channel.send({
                 embeds: [ticketEmbed],
                 components: [row1, row2],
@@ -94,10 +100,12 @@ export default {
 
         } catch (error) {
             console.error('Error executing ticket-panel command:', error);
-            await interaction.reply({
-                content: '❌ Error sending ticket panel.',
-                ephemeral: true,
-            });
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({
+                    content: '❌ Error sending ticket panel.',
+                    ephemeral: true,
+                });
+            }
         }
     },
 };
