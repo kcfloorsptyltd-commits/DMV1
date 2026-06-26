@@ -9,6 +9,7 @@ import { checkRateLimit, getRateLimitStatus } from '../utils/rateLimiter.js';
 import { logEvent, EVENT_TYPES } from './loggingService.js';
 
 const GIVEAWAY_INTERACTION_COOLDOWN = 1000;
+const BOTTOM_BANNER_URL = 'https://cdn.discordapp.com/attachments/1519924301908803595/1520023178204680364/ezgif.com-video-to-gif-converter_2.gif?ex=6a3faf66&is=6a3e5de6&hm=e7e9ab73f56f7b0c4b8d1f75407ee78da1e34a015b77ae9131a1ecabc8b7ad1b';
 
 function getGiveawayInteractionKey(userId, giveawayId) {
     return `giveaway:${userId}:${giveawayId}`;
@@ -145,7 +146,6 @@ export function createGiveawayEmbed(giveaway, status, winners = []) {
         const darkRed = '#8B0000';
         const bannerUrl = 'https://media.discordapp.net/attachments/1319156527949299713/1319156644881788959/kcfloors-banner.gif';
         const thumbnailUrl = 'https://cdn.discordapp.com/attachments/1519924301908803595/1519937961192329287/ezgif.com-video-to-gif-converter_1.gif?ex=6a3f6009&is=6a3e0e89&hm=2de8e983dacc74b97748';
-        const bottomBannerUrl = 'https://cdn.discordapp.com/attachments/1519924301908803595/1520023178204680364/ezgif.com-video-to-gif-converter_2.gif?ex=6a3faf66&is=6a3e5de6&hm=e7e9ab73f56f7b0c4b8d1f75407ee78da1e34a015b77ae9131a1ecabc8b7ad1b';
         
         const embed = new EmbedBuilder()
             .setColor(darkRed)
@@ -199,7 +199,7 @@ export function createGiveawayEmbed(giveaway, status, winners = []) {
         embed.setImage(bannerUrl);
         embed.setTimestamp();
         
-        return { embed, bottomBannerUrl };
+        return embed;
     } catch (error) {
         logger.error('Error creating giveaway embed:', error);
         throw new TitanBotError(
@@ -308,6 +308,10 @@ export async function recordUserInteraction(userId, giveawayId) {
     );
 }
 
+export function getBottomBannerUrl() {
+    return BOTTOM_BANNER_URL;
+}
+
 export async function endGiveaway(client, giveaway, guildId, endedBy) {
     try {
         if (!giveaway) {
@@ -409,7 +413,7 @@ export async function checkGiveaways(client) {
           ? winners.map(id => `<@${id}>`).join(', ')
           : 'No valid entries!';
 
-        const { embed: endedEmbed, bottomBannerUrl } = createGiveawayEmbed(giveaway, 'ended', winners);
+        const endedEmbed = createGiveawayEmbed(giveaway, 'ended', winners);
 
         await message.edit({
           embeds: [endedEmbed],
