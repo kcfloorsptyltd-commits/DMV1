@@ -11,6 +11,12 @@ import createTicketHandler, {
   linkRsnModalHandler,
   unlinkRsnModalHandler,
 } from '../../handlers/ticketButtons.js';
+import {
+  rsnLinkApproveHandler,
+  rsnLinkDeclineHandler,
+  rsnUnlinkApproveHandler,
+  rsnUnlinkDeclineHandler,
+} from '../../handlers/rsnApprovalHandlers.js';
 
 export default [
   createTicketHandler,
@@ -25,4 +31,8 @@ export default [
   unlinkRsnButtonHandler,
   linkRsnModalHandler,
   unlinkRsnModalHandler,
+  rsnLinkApproveHandler,
+  rsnLinkDeclineHandler,
+  rsnUnlinkApproveHandler,
+  rsnUnlinkDeclineHandler,
 ];
