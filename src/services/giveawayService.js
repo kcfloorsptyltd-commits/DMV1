@@ -143,8 +143,8 @@ export function createGiveawayEmbed(giveaway, status, winners = []) {
     try {
         const isEnded = status === 'ended' || status === 'reroll';
         const darkRed = '#8B0000';
-        const bannerUrl = 'https://cdn.discordapp.com/attachments/1519924301908803595/1519935885720682546/ezgif.com-video-to-gif-converter.gif?ex=6a3f5e1a&is=6a3e0c9a&hm=7e6e5a6aba0ce41666b521559b5dcbbeaea40e301c59d0eafac8530e4bd7a69d&';
-        const thumbnailUrl = 'https://cdn.discordapp.com/attachments/1519924301908803595/1519937961192329287/ezgif.com-video-to-gif-converter_1.gif?ex=6a3f6009&is=6a3e0e89&hm=2de8e983dacc74b97748b71aafddacc2529b001cf410f880ef15c55e022ec337&';
+        const bannerUrl = 'https://media.discordapp.net/attachments/1319156527949299713/1319156644881788959/kcfloors-banner.gif';
+        const thumbnailUrl = 'https://cdn.discordapp.com/attachments/1519924301908803595/1519937961192329287/ezgif.com-video-to-gif-converter_1.gif?ex=6a3f6009&is=6a3e0e89&hm=2de8e983dacc74b97748';
         
         const embed = new EmbedBuilder()
             .setColor(darkRed)
