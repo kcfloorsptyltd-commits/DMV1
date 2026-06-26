@@ -197,10 +197,9 @@ export function createGiveawayEmbed(giveaway, status, winners = []) {
         }
 
         embed.setImage(bannerUrl);
-        embed.setFooter({ text: ' ', iconURL: bottomBannerUrl });
         embed.setTimestamp();
         
-        return embed;
+        return { embed, bottomBannerUrl };
     } catch (error) {
         logger.error('Error creating giveaway embed:', error);
         throw new TitanBotError(
@@ -410,7 +409,7 @@ export async function checkGiveaways(client) {
           ? winners.map(id => `<@${id}>`).join(', ')
           : 'No valid entries!';
 
-        const endedEmbed = createGiveawayEmbed(giveaway, 'ended', winners);
+        const { embed: endedEmbed, bottomBannerUrl } = createGiveawayEmbed(giveaway, 'ended', winners);
 
         await message.edit({
           embeds: [endedEmbed],
