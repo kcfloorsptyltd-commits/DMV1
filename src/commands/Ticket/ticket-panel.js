@@ -10,7 +10,7 @@ export default {
 
     async execute(interaction) {
         try {
-            const bannerUrl = process.env.BANNER_URL || 'https://i.imgur.com/ENlr2PM.png';
+            const bannerUrl = process.env.BANNER_URL || 'https://cdn.discordapp.com/attachments/1519924301908803595/1519924344099180564/kling_20260626_VIDEO_Create_a_s_3097_0-ezgif.com-speed.gif?ex=6a3f535a&is=6a3e01da&hm=4b1900bb59f16787a6e5c0591db023f29ea02cdc2cec9f44bb29e45c60c6be6e&';
             const thumbnailUrl = process.env.THUMBNAIL_URL || 'https://i.imgur.com/pD661M1.png';
 
             // DM V1 Ticket Panel Embed
