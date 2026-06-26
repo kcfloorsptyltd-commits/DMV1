@@ -84,10 +84,25 @@ export default {
                         .setEmoji('📋'),
                 );
 
+            // Button Row 3: Link RSN, Unlink RSN
+            const row3 = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('ticket_link_rsn')
+                        .setLabel('Link RSN')
+                        .setStyle(ButtonStyle.Primary)
+                        .setEmoji('🔗'),
+                    new ButtonBuilder()
+                        .setCustomId('ticket_unlink_rsn')
+                        .setLabel('Unlink RSN')
+                        .setStyle(ButtonStyle.Primary)
+                        .setEmoji('🔓'),
+                );
+
             // Send the panel to the current channel
             await interaction.channel.send({
                 embeds: [ticketEmbed],
-                components: [row1, row2],
+                components: [row1, row2, row3],
             });
 
             await interaction.reply({
