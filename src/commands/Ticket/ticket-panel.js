@@ -11,7 +11,7 @@ export default {
     async execute(interaction) {
         try {
             const bannerUrl = process.env.BANNER_URL || 'https://cdn.discordapp.com/attachments/1519924301908803595/1519935885720682546/ezgif.com-video-to-gif-converter.gif?ex=6a3f5e1a&is=6a3e0c9a&hm=7e6e5a6aba0ce41666b521559b5dcbbeaea40e301c59d0eafac8530e4bd7a69d&';
-            const thumbnailUrl = process.env.THUMBNAIL_URL || 'https://i.imgur.com/pD661M1.png';
+            const thumbnailUrl = process.env.THUMBNAIL_URL || 'https://cdn.discordapp.com/attachments/1519924301908803595/1519938265250271403/ezgif.com-crop.gif?ex=6a3f6051&is=6a3e0ed1&hm=8312420bd4d0b84c6d9f56a38898605213c31e8f23c7219b21d7bc30ae13fb4d&';
 
             // DM V1 Ticket Panel Embed
             const ticketEmbed = new EmbedBuilder()
