@@ -2,6 +2,7 @@ import { ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder, MessageFlag
 import { replyUserError, ErrorTypes } from '../utils/errorHandler.js';
 import { InteractionHelper } from '../utils/interactionHelper.js';
 import { logger } from '../utils/logger.js';
+import { linkOsrsUsername, unlinkSpecificOsrsUsername } from '../utils/database/osrs.js';
 
 const rsnLinkApproveHandler = {
   name: 'rsn_link_approve',
@@ -13,13 +14,18 @@ const rsnLinkApproveHandler = {
     if (!deferSuccess) return;
 
     try {
-      // TODO: Add RSN to database for user (link RSN to Discord user)
-      // This would integrate with your OSRS link system
-      
+      // Link the RSN to the user's profile
+      const linkSuccess = await linkOsrsUsername(client, interaction.guildId, userId, rsn);
+
+      if (!linkSuccess) {
+        await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'Failed to link RSN to profile.' });
+        return;
+      }
+
       const approvalEmbed = new EmbedBuilder()
         .setColor(0x00ff00)
         .setTitle('✅ RSN Link Approved')
-        .setDescription(`<@${userId}>'s OSRS username **${rsn}** has been approved and linked.`)
+        .setDescription(`<@${userId}>'s OSRS username **${rsn}** has been approved and linked to their profile.`)
         .setTimestamp();
 
       await interaction.editReply({
@@ -30,7 +36,7 @@ const rsnLinkApproveHandler = {
       // Remove buttons from original message
       await interaction.message.edit({ components: [] }).catch(() => {});
 
-      logger.info('RSN link approved', {
+      logger.info('RSN link approved and added to profile', {
         guildId: interaction.guildId,
         userId,
         rsn,
@@ -67,7 +73,17 @@ const rsnLinkDeclineHandler = {
       // Remove buttons from original message
       await interaction.message.edit({ components: [] }).catch(() => {});
 
-      logger.info('RSN link declined', {
+      // Close the ticket
+      const channel = interaction.channel;
+      if (channel && typeof channel.delete === 'function') {
+        setTimeout(() => {
+          channel.delete('RSN link request declined').catch((err) => {
+            logger.error('Error deleting ticket channel:', err);
+          });
+        }, 3000);
+      }
+
+      logger.info('RSN link declined and ticket closed', {
         guildId: interaction.guildId,
         userId,
         rsn,
@@ -90,13 +106,18 @@ const rsnUnlinkApproveHandler = {
     if (!deferSuccess) return;
 
     try {
-      // TODO: Remove RSN from database for user (unlink RSN from Discord user)
-      // This would integrate with your OSRS unlink system
+      // Unlink the RSN from the user's profile
+      const unlinkSuccess = await unlinkSpecificOsrsUsername(client, interaction.guildId, userId, rsn);
+
+      if (!unlinkSuccess) {
+        await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'Failed to unlink RSN from profile.' });
+        return;
+      }
 
       const approvalEmbed = new EmbedBuilder()
         .setColor(0x00ff00)
         .setTitle('✅ RSN Unlink Approved')
-        .setDescription(`<@${userId}>'s OSRS username **${rsn}** has been approved for removal.`)
+        .setDescription(`<@${userId}>'s OSRS username **${rsn}** has been approved for removal and unlinked from their profile.`)
         .setTimestamp();
 
       await interaction.editReply({
@@ -107,7 +128,7 @@ const rsnUnlinkApproveHandler = {
       // Remove buttons from original message
       await interaction.message.edit({ components: [] }).catch(() => {});
 
-      logger.info('RSN unlink approved', {
+      logger.info('RSN unlink approved and removed from profile', {
         guildId: interaction.guildId,
         userId,
         rsn,
@@ -144,7 +165,17 @@ const rsnUnlinkDeclineHandler = {
       // Remove buttons from original message
       await interaction.message.edit({ components: [] }).catch(() => {});
 
-      logger.info('RSN unlink declined', {
+      // Close the ticket
+      const channel = interaction.channel;
+      if (channel && typeof channel.delete === 'function') {
+        setTimeout(() => {
+          channel.delete('RSN unlink request declined').catch((err) => {
+            logger.error('Error deleting ticket channel:', err);
+          });
+        }, 3000);
+      }
+
+      logger.info('RSN unlink declined and ticket closed', {
         guildId: interaction.guildId,
         userId,
         rsn,
