@@ -46,6 +46,7 @@ export {
     getTicketCounter,
     incrementTicketCounter,
     getGuildTicketStats,
+    hasOpenTicketOfType,
 } from './database/tickets.js';
 
 export {
