@@ -11,7 +11,7 @@ export default {
     async execute(interaction) {
         try {
             const bannerUrl = process.env.BANNER_URL || 'https://i.imgur.com/ENlr2PM.png';
-            const thumbnailUrl = process.env.THUMBNAIL_URL || null;
+            const thumbnailUrl = process.env.THUMBNAIL_URL || 'https://i.imgur.com/pD661M1.png';
 
             // DM V1 Ticket Panel Embed
             const ticketEmbed = new EmbedBuilder()
@@ -30,12 +30,9 @@ export default {
                     `📋 **Any Other Requests** - Any other issues or requests.`
                 )
                 .setImage(bannerUrl)
+                .setThumbnail(thumbnailUrl)
                 .setFooter({ text: 'DM V1 Support • Fast. Secure. Trusted.' })
                 .setTimestamp();
-
-            if (thumbnailUrl) {
-                ticketEmbed.setThumbnail(thumbnailUrl);
-            }
 
             // Button Row 1: DM Coin Deposit, DM Coin Withdrawal, GP Purchase, Balance Enquiry
             const row1 = new ActionRowBuilder()
