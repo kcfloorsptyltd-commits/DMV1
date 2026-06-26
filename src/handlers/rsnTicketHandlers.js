@@ -1,9 +1,9 @@
 import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from 'discord.js';
-import { createTicket } from '../../services/ticketService.js';
-import { getGuildConfig } from '../../services/guildConfig.js';
-import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
-import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { logger } from '../../utils/logger.js';
+import { createTicket } from '../services/ticket.js';
+import { getGuildConfig } from '../services/guildConfig.js';
+import { replyUserError, ErrorTypes } from '../utils/errorHandler.js';
+import { InteractionHelper } from '../utils/interactionHelper.js';
+import { logger } from '../utils/logger.js';
 import { MessageFlags } from 'discord.js';
 
 const linkRsnButtonHandler = {
