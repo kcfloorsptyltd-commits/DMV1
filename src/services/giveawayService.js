@@ -145,13 +145,11 @@ export function createGiveawayEmbed(giveaway, status, winners = []) {
         const isEnded = status === 'ended' || status === 'reroll';
         const darkRed = '#8B0000';
         const bannerUrl = 'https://media.discordapp.net/attachments/1319156527949299713/1319156644881788959/kcfloors-banner.gif';
-        const thumbnailUrl = 'https://cdn.discordapp.com/attachments/1519924301908803595/1519937961192329287/ezgif.com-video-to-gif-converter_1.gif?ex=6a3f6009&is=6a3e0e89&hm=2de8e983dacc74b97748';
         
         const embed = new EmbedBuilder()
             .setColor(darkRed)
             .setTitle('🎫 NEW GIVEAWAY')
             .setDescription('JOIN • COMPETE • WIN')
-            .setThumbnail(thumbnailUrl)
             .addFields(
                 {
                     name: '💰 PRIZE POOL',
